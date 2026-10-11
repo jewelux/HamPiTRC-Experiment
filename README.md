@@ -79,6 +79,6 @@ python -m unittest discover -p test_ic705_official.py
 
 The existing tests use a fake serial connection. They check selected frames, parsing and error handling; they do not prove hardware compatibility or independently validate the protocol against an Icom manual.
 
-`test_hamlib.sh` is an optional legacy hardware diagnostic requiring Hamlib (`rigctl`). `test_freq.py` is a legacy speech experiment using a German voice and an extra frequency multiplier; it is not part of normal operation and its scaling needs review. Run hardware diagnostics separately from the controller so they do not share the serial port.
+`test_hamlib.sh` is an optional legacy hardware diagnostic requiring Hamlib (`rigctl`). `test_freq.py` is a legacy speech experiment using an extra frequency multiplier; it is not part of normal operation and its scaling needs review. Run hardware diagnostics separately from the controller so they do not share the serial port.
 
 Memory write/clear operations and tuner commands are present. Consult the key reference before using them on a radio.
