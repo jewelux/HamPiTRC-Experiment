@@ -21,9 +21,10 @@ CW, FM, AM, RTTY, CW-R, RTTY-R, DV. Tuner commands drive an external AH-705.
 
 ## Still to confirm on the radio
 
-- S-meter on the new Icom scale (0.8.0-dev): compare with the radio's meter
-- DV mode select (CI-V code 17h since 0.8.0-dev)
-- memory write and clear (now with confirmation), tuner, GPS, DV data
-- power meter percent scale
+- the HamTRC keypad layout of 0.8.0-dev, with `icom-test-list.txt`
+- S-meter on the new Icom scale: compare with the radio's meter
+- DV mode select (mode digit `0`, CI-V code 17h)
+- RF power in watts, output power and ALC readings
+- auto notch and the notch widths
 
 Use `icom-test-list.txt` and note date and result here.

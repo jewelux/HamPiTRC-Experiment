@@ -24,7 +24,11 @@ For building, adapting, testing and adding radios. Quick setup:
 ## Layout
 
 ```
-pihamtrc.py          keypad loop and the nine banks
+pihamtrc.py          reads the keypad, startup
+keypad_input.py      keypad state machine (HamTRC keypad_input.cpp)
+banks.py             keymap: every bank key (HamTRC keypad_keymap.cpp)
+ui.py                carries out actions: speech, entries, focus steps
+settings.py          settings for A/B/C, entries and picks (HamTRC SettingOps)
 radio.py             active radio, capability gate, prefs file
 radio_profiles.py    built-in radio profiles
 civ.py               Icom CI-V protocol
@@ -43,15 +47,26 @@ profile file: the table is part of the program.
 
 ## How a key reaches the radio
 
-1. `pihamtrc.py` reads the key, decides short, long or double, and calls the
-   bank handler, e.g. `handle_short_bank2('1')`.
-2. The handler calls `radio.get_nr()`.
-3. `radio.py` looks up `get_nr` in `FEATURE_OF` → `nr`, checks
-   `current().caps.nr`. Off: raises `NotAvailable('nr')`, which
-   `run_action()` speaks as "Noise reduction not available on …". On: calls
-   `civ.get_nr()`.
-4. `civ.py` sends `FE FE <addr> E0 16 40 FD` and parses the reply.
-5. The handler speaks the result through `speech.say_nice()`.
+1. `pihamtrc.py` reads the keypad and calls `keypad.press()` / `release()`;
+   `poll()` runs every 20 ms for holds, double presses and timeouts.
+2. `keypad_input.py` decides the gesture (short, long, double, short then
+   hold) and asks `banks.lookup(ui, bank, key, focus)` for the key's
+   `Binding`. In help mode it says the binding's help text instead.
+3. `ui.run()` runs the action, e.g. Bank 2 `1` short says noise reduction.
+4. The action calls `radio.get_nr()`. `radio.py` looks up `get_nr` in
+   `FEATURE_OF` → `nr` and checks the profile. Off: `NotAvailable`, spoken as
+   "Noise reduction not available on …". On: `civ.get_nr()`.
+5. `civ.py` sends `FE FE <addr> E0 16 40 FD` and parses the reply.
+6. `ui.value()` speaks the answer, with the name when verbose is on.
+
+## Add a key
+
+Keys are in `banks.py`, one function per bank. Helpers build the usual kinds:
+`setting_key` (say, entry, focus), `list_key` (say, next, focus),
+`switch_key` (say, on/off), `switch_with_level` (NR, NB, monitor),
+`not_available`. A setting for A/B/C goes in `settings.py`. Every gesture
+with an action needs a help text; `tests/test_keypad_banks.py` runs every key,
+gesture and radio and checks that.
 
 ## Add a radio
 
@@ -82,7 +97,7 @@ python -m unittest discover -s tests
 
 The tests replace the serial port with a fake, and evdev and Piper with
 stand-ins, so they run on any computer. They check frames, parsing, the
-capability gate, the confirmation for memory write/clear and keypad
+capability gate, the keypad state machine, every key on every radio and keypad
 detection. They do not prove that a radio answers the same way.
 
 Run hardware diagnostics separately from the controller so they do not share
@@ -90,9 +105,10 @@ the serial port.
 
 ## Prefs file
 
-`~/.config/hampitrc/prefs.json` holds the last radio and, after long `D` in
-Bank 8, the CI-V address and baud rate per radio. Delete it to go back to the
-defaults. `HAMPITRC_PREFS` overrides the path.
+`~/.config/hampitrc/prefs.json` holds the last radio, the CI-V address and
+baud rate per radio (changed in Bank 8), and the speech settings: verbose,
+volume, speed, tuning speech. Delete it to go back to the defaults; Bank 9 `1`
+double resets one radio. `HAMPITRC_PREFS` overrides the path.
 
 ## Autostart (systemd)
 

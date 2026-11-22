@@ -27,8 +27,10 @@ Modes: LSB, USB, CW, FM, AM, RTTY, CW-R, RTTY-R.
 1. Bank 1: `0` frequency, `9` mode, `7` S-meter, `8` SWR (transmitting).
 2. Bank 2: NR, NB, notch, filter shape and width.
 3. Bank 3: VFO A/B readout, split.
-4. Bank 4: tuner, monitor, transceive.
+4. Bank 4: tuner, monitor. Bank 8 `3`: transceive.
 5. Bank 5: RIT.
-6. Bank 7, key `8`: must say "GPS not available".
+6. Bank 6, key `0`: must say "repeater not available".
+
+The whole list: `icom-test-list.txt`.
 
 Note results with date in this file, then update the support matrix.

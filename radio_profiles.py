@@ -30,7 +30,9 @@ class Capabilities:
     tx_status: bool = False       # 1C 00
     tx_freq: bool = False         # 1C 03
     lock: bool = False            # 16 50
+    alc_meter: bool = False       # 15 13
     # Bank 2: filter and receive DSP
+    auto_notch: bool = False      # 16 41
     nr: bool = False              # 16 40
     nr_level: bool = False        # 14 06
     nb: bool = False              # 16 22
@@ -69,7 +71,6 @@ class Capabilities:
     dv_data: bool = False         # 22 02 / 22 03
     gps: bool = False             # 23 01 / 16 5C
     # Extra meters (not on a key yet)
-    alc_meter: bool = False       # 15 13
     comp_meter: bool = False      # 15 14
     vd_meter: bool = False        # 15 15
     id_meter: bool = False        # 15 16
@@ -80,7 +81,7 @@ FEATURE_NAMES = {
     'freq': 'Frequency', 'mode': 'Mode', 'smeter': 'S meter',
     'power_meter': 'Power meter', 'rf_power': 'RF power', 'swr': 'SWR',
     'tx_status': 'TX status', 'tx_freq': 'TX frequency', 'lock': 'Lock',
-    'nr': 'Noise reduction', 'nr_level': 'NR level', 'nb': 'Noise blanker',
+    'auto_notch': 'Auto notch', 'nr': 'Noise reduction', 'nr_level': 'NR level', 'nb': 'Noise blanker',
     'nb_level': 'NB level', 'notch': 'Notch', 'notch_width': 'Notch width',
     'pbt': 'PBT', 'filter_shape': 'Filter shape', 'filter_width': 'Filter width',
     'preamp': 'Preamp', 'att': 'Attenuator', 'agc': 'AGC', 'vfo': 'VFO',
@@ -116,6 +117,7 @@ class RadioProfile:
     caps: Capabilities
     modes: tuple              # mode names it can select, see MODE_CODES
     transceive_menu_item: int = 0  # 1A 05 menu number of "CI-V Transceive"
+    rf_power_max_watts: int = 100  # RF power 14 0A: 255 is this many watts
     status: str = 'not tested'     # hardware status, as in the support matrix
     notes: str = ''
 
@@ -125,7 +127,7 @@ class RadioProfile:
 # USB numeric keypad, PC speakers). Address A4h (CI-V guide, Hamlib).
 IC705_CAPS = Capabilities(
     freq=True, mode=True, smeter=True, power_meter=True, rf_power=True,
-    swr=True, tx_status=True, tx_freq=True, lock=True,
+    swr=True, tx_status=True, tx_freq=True, lock=True, auto_notch=True,
     nr=True, nr_level=True, nb=True, nb_level=True, notch=True,
     notch_width=True, pbt=True, filter_shape=True, filter_width=True,
     preamp=True, att=True, agc=True,
@@ -158,7 +160,7 @@ IC7300_CAPS = replace(
 # until checked against the IC-7100 CI-V guide.
 IC7100_CAPS = Capabilities(
     freq=True, mode=True, smeter=True, power_meter=True, rf_power=True,
-    swr=True, tx_status=True, lock=True,
+    swr=True, tx_status=True, lock=True, auto_notch=True,
     nr=True, nr_level=True, nb=True, nb_level=True, notch=True,
     pbt=True, filter_width=True, preamp=True, att=True, agc=True,
     vfo=True, split=True,
@@ -175,7 +177,7 @@ PROFILES = (
         key='ic705', name='Icom IC-705', spoken='I C seven oh five',
         civ_addr=0xA4, baud=115200, bauds=CIV_BAUDS,
         serial_port='/dev/ttyACM0', caps=IC705_CAPS,
-        modes=HF_MODES + ('DV',), transceive_menu_item=0x0131,
+        modes=HF_MODES + ('DV',), transceive_menu_item=0x0131, rf_power_max_watts=10,
         status='tested on hardware',
         notes='Raspberry Pi 5, USB numeric keypad, PC speakers.',
     ),

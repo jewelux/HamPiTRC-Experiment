@@ -32,6 +32,7 @@ Modes: LSB, USB, CW, FM, AM, RTTY, CW-R, RTTY-R, WFM, DV.
 
 ## First test
 
-Bank 1 (`0`, `9`, `7`, `8`), Bank 2, Bank 3 (`0`, `A`, `B`, `C`), Bank 6
-(`0`, `1`, `2`) and Bank 7 (`0` memory mode, `3` scan stop). Each switched-off
-feature should say "not available on I C seventy-one hundred".
+Bank 1 (`0`, `9`, `7`, `8`), Bank 2, Bank 3 (`0`, `1` long, `2` long), Bank 6
+(`0`, `2`, `5`). Each switched-off feature should say "… not available on I C
+seventy-one hundred", for example Bank 5 (RIT). The whole list:
+`icom-test-list.txt`.

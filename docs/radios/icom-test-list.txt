@@ -11,32 +11,38 @@ Start
 [ ] "PiHAMTRC ready", radio name, mode and frequency are spoken
 [ ] Bank 9, A: says the radio's name
 
+Keypad
+[ ] * short says the bank; * long, 2: bank two
+[ ] D long: "help on"; a key says what it would do; # ends it
+
 Bank 1
 [ ] 0 short: frequency matches the radio
-[ ] 0 long, 14250, D: radio goes to 14.250 MHz
+[ ] 0 long, 14*25, D: radio goes to 14.250 MHz
+[ ] 0 double: frequency rounded to 500 Hz
 [ ] 9 short: mode matches
 [ ] 9 long, 2, D: radio goes to USB
 [ ] 7 short: S-meter roughly matches the radio's meter (S9 = "S 9")
-[ ] 1 short: "Receiving"
-[ ] 6 short: RF power percent matches
+[ ] 1 short: "receiving"
+[ ] 6 short: RF power in watts matches; B: "power .. please", D sets it
 [ ] 3 long: lock toggles on the radio
 
 Bank 2
-[ ] 1 long: NR toggles     [ ] 2 long: NB toggles     [ ] 3 long: notch toggles
-[ ] A long: preamp steps   [ ] B long: attenuator     [ ] C long: AGC steps
+[ ] 1 long: NR toggles; 1 double: NR level; then B: level +5 percent
+[ ] 2 long: NB toggles     [ ] 3 long: notch off, narrow, mid, wide
+[ ] 0 long: auto notch     [ ] 7 long, 2, D: AGC fast
+[ ] 8 long: preamp steps   [ ] 9 long: attenuator
 
 Bank 3
-[ ] A / B / C: VFO A, VFO B, swap on the radio
-[ ] 0 long: split toggles
+[ ] 1 long / 2 long: VFO A, VFO B on the radio
+[ ] 0 long: split toggles  [ ] 2 short: VFO B frequency
 
 Bank 4 / 5 / 6 (as the radio has them)
-[ ] tuner status          [ ] monitor level
-[ ] RIT status and +10 Hz [ ] duplex, repeater tone
+[ ] 0: tuner status        [ ] 3 double: monitor level
+[ ] Bank 5 B: RIT +10 Hz   [ ] Bank 6 0 long: repeater minus
 
-Bank 7 - careful, use a spare memory channel
-[ ] 2 long: asks "Memory clear. D to confirm, sharp to cancel"
-[ ] # cancels, nothing changed on the radio
-[ ] 3 short: scan stop
+Bank 9
+[ ] 5 long: verbose off, answers without names
+[ ] 7 long, 6, D: volume 6 [ ] 8 long: speed fast
 
 Not available
 [ ] a feature the radio lacks says "... not available on ..." and the radio

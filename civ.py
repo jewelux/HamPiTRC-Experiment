@@ -462,6 +462,15 @@ def get_nr():
 def set_nr(on):
     _set_16_byte(0x40, 0x01 if on else 0x00)
 
+def get_auto_notch():
+    value = _query_16_byte(0x41)
+    if value is None:
+        return None
+    return value != 0x00
+
+def set_auto_notch(on):
+    _set_16_byte(0x41, 0x01 if on else 0x00)
+
 def get_nb():
     value = _query_16_byte(0x22)
     if value is None:

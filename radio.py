@@ -52,6 +52,7 @@ FEATURE_OF = {
     'get_lock': 'lock', 'set_lock': 'lock',
     'get_nr': 'nr', 'set_nr': 'nr',
     'get_nr_level_percent': 'nr_level', 'set_nr_level_percent': 'nr_level',
+    'get_auto_notch': 'auto_notch', 'set_auto_notch': 'auto_notch',
     'get_nb': 'nb', 'set_nb': 'nb',
     'get_nb_level_percent': 'nb_level', 'set_nb_level_percent': 'nb_level',
     'get_notch': 'notch', 'set_notch': 'notch',
@@ -112,8 +113,17 @@ def current():
     return _profile
 
 
+_experimental = False
+
+
+def set_experimental(on):
+    """HamTRC experimental mode: every feature counts as supported."""
+    global _experimental
+    _experimental = bool(on)
+
+
 def has(feature):
-    return bool(getattr(_profile.caps, feature))
+    return _experimental or bool(getattr(_profile.caps, feature))
 
 
 def __getattr__(name):
@@ -212,6 +222,15 @@ def switch(step):
         return True
     except Exception:
         return False
+
+
+def reset_link():
+    """Back to the profile's CI-V address and baud rate (HamTRC: profile reset)."""
+    prefs = load_prefs()
+    prefs.get('radios', {}).pop(_profile.key, None)
+    save_prefs(prefs)
+    civ.configure(_profile.civ_addr, _profile.baud, _profile.transceive_menu_item)
+    civ.set_baudrate(_profile.baud)
 
 
 def remember_link():

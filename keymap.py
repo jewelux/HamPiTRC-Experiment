@@ -1,4 +1,8 @@
-# PiHAMTRC Key mapping
+# HamPiTRC keypad: USB numeric keypad keycodes -> HamTRC logical keys.
+#
+# HamTRC has a 4x4 keypad (1 2 3 A / 4 5 6 B / 7 8 9 C / * 0 # D). On a PC
+# numeric keypad the digits sit upside down (7 8 9 on top); the logical keys
+# and every bank function are the same.
 KEY_MAP = {
     'KEY_KP1':       '1',
     'KEY_KP2':       '2',
@@ -16,16 +20,4 @@ KEY_MAP = {
     'KEY_BACKSPACE': 'A',
     'KEY_KPMINUS':   'B',
     'KEY_KPPLUS':    'C',
-}
-
-BANK_NAMES = {
-    1: 'Bank one, main functions',
-    2: 'Bank two, filter',
-    3: 'Bank three, VFO',
-    4: 'Bank four, monitor',
-    5: 'Bank five, RIT',
-    6: 'Bank six, repeater',
-    7: 'Bank seven, memory scan D Star GPS',
-    8: 'Bank eight, CI V setup',
-    9: 'Bank nine, system',
 }

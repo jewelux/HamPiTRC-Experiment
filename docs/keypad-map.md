@@ -1,245 +1,187 @@
-# HamPiTRC keypad map
+# HamPiTRC Keypad Map
 
-Start:
+What every bank key does. The layout and the behaviour are HamTRC's (development
+branch, `docs/keypad-map.md` there, Icom column), so a HamTRC user finds every
+function under the same key number. Where HamPiTRC cannot do something yet, the
+key says "not available"; a free key beeps.
 
-```sh
-python -B pihamtrc.py
-```
+## The keypad
 
-Exit: `NumLock` + `Tab`.
+HamTRC has a 4x4 keypad; HamPiTRC a PC numeric keypad. The logical keys are the
+same, but the digits sit upside down (7 8 9 on top):
 
-## Basic operation
+| HamTRC 4x4 | | | | | USB numeric keypad | | | |
+|---|---|---|---|---|---|---|---|---|
+| 1 | 2 | 3 | A | | 7 | 8 | 9 | Backspace = A |
+| 4 | 5 | 6 | B | | 4 | 5 | 6 | Minus = B |
+| 7 | 8 | 9 | C | | 1 | 2 | 3 | Plus = C |
+| * | 0 | # | D | | 0 | Space = * | Dot = # | Enter = D |
 
-- Short press: function from the active bank.
-- Long press: alternative function, from about 0.5 seconds.
-- Double-click: reverse or decrease, where implemented.
-- `*` short: announce the active bank.
-- `*` long: enter a bank number and confirm with `D`.
-- `#`: cancel an entry.
-- `D`: confirm an entry.
+`NumLock` + `Tab` ends HamPiTRC (HamPiTRC only).
 
-A key whose function the active radio does not have says, for example,
-"GPS not available on I C seventy-three hundred" and sends nothing to the
-radio. Which radio has what: [radio-support-matrix.md](radio-support-matrix.md).
+## Presses
 
-## Numeric entry
+- **short**: on release. Ask or read something.
+- **long** (hold 0.7 s): change something. Acts at the hold.
+- **double**: a quick second press (within 0.22 s), only where a key has one.
+- **short, then hold**: a quick press followed by a hold of the same key.
+- One key at a time: a second key while one is down beeps, and both are ignored.
+- `*` short: the bank. `*` long, let go, a digit: change bank. `*` long and,
+  still holding `*`, a digit: the next key only acts on that bank.
+- `D` long: help mode on/off. Each key then says what it would do and does
+  nothing. `#` or `D` long ends it.
+- `#`: cancel an entry, end help mode. `D`: confirm an entry.
+- An entry left for 30 seconds ends with "timeout".
+- A new key press stops the current speech.
 
-- Frequency: in kHz, confirm with `D`. Example: `14250` = 14.250 MHz.
-- Mode: one digit, confirm with `D`.
-- RF power and monitor level: percent `0` to `100`, confirm with `D`.
-- CI-V address: decimal `0` to `255`, confirm with `D`.
-- Memory channel: `0` to `99`, confirm with `D`.
-- Memory write and memory clear: `D` confirms, `#` cancels. No other key
-  does anything until one of the two is pressed.
+## Focus: A, B and C
 
-## Mode digits
+`A`, `B` and `C` act on the bank's focus: the setting of the last key on that
+bank that has one. Bank 5 starts on the RIT offset, Bank 8 on the baud rate and
+Bank 9 on the profile; the other banks start with none, and `A`, `B`, `C` then
+say "focus not available".
 
-| Key | Mode |
-| --- | --- |
-| `1` | LSB |
-| `2` | USB |
-| `3` | CW |
-| `4` | FM |
-| `5` | AM |
-| `6` | RTTY |
-| `7` | CW-R |
-| `8` | DV (IC-705, IC-7100) |
-| `9` | RTTY-R |
+| Press | Does |
+|---|---|
+| `A` short | the focus with its name |
+| `A` long | its entry or pick |
+| `A` double | back to the centre (PBT 0, RIT 0, normal speed, profile reset) |
+| `B` / `C` short | one step up / down; the first names the setting, the next only the value |
+| `B` / `C` long | a big step (5 steps; volume 2; RIT 100 Hz); mode, profile, baud: not available |
 
-## Bank selection
+RF power and the mode wait for `D`: `B` or `C` opens the entry one step away
+("power 6 watts please"), more `B`/`C` step, `D` sets, `#` cancels. Past the
+end: "maximum" or "minimum".
 
-Hold `*`, type the bank number, then press `D`.
+## Bank 1 - Status
 
-| Bank | Name |
-| --- | --- |
-| `1` | Main functions |
-| `2` | Filter |
-| `3` | VFO |
-| `4` | Monitor |
-| `5` | RIT |
-| `6` | Repeater |
-| `7` | Memory, Scan, D-STAR, GPS |
-| `8` | CI-V Setup |
-| `9` | System |
+| Key | Short | Long | Double |
+|---|---|---|---|
+| `0` | frequency | frequency entry (MHz, `*` point) | round to 500 Hz |
+| `1` | RX or TX | | |
+| `2` | TX frequency | | |
+| `3` | lock | lock on/off | |
+| `4` | output power | | |
+| `5` | ALC | | |
+| `6` | RF power setting (focus) | RF power entry | |
+| `7` | S-meter | | |
+| `8` | SWR (in receive: "swr tx only") | | |
+| `9` | mode (focus) | mode select | |
 
-## Bank 1: Main functions
+Frequency entry: `14` `D` = 14 MHz, `14*1` `D` = 14.1 MHz, `7*12345` `D` =
+7.12345 MHz. Frequencies are spoken digit by digit: "one four point one".
 
-| Key | Short | Long | Double-click |
-| --- | --- | --- | --- |
-| `0` | Announce Frequency | Enter Frequency | No function |
-| `1` | Announce TX/RX status | No function | No function |
-| `2` | Announce TX-Frequency | No function | No function |
-| `3` | Announce Lock status | Lock on/off | No function |
-| `4` | Announce Power Meter, otherwise RF Power | No function | No function |
-| `5` | No function | No function | No function |
-| `6` | Announce RF Power | Enter RF Power | No function |
-| `7` | Announce S-Meter | No function | No function |
-| `8` | Announce SWR | No function | No function |
-| `9` | Announce Mode | Enter Mode | No function |
-| `A` | Select VFO A | No function | No function |
-| `B` | Select VFO B | No function | No function |
-| `C` | Swap VFO A/B | No function | No function |
-| `D` | Announce Version and callsign | No function | No function |
+Mode digits: `1` LSB, `2` USB, `3` CW, `4` AM, `5` FM, `7` RTTY, `8` CW-R,
+`9` RTTY-R; `0` DV (IC-705, IC-7100, HamPiTRC only). `6` (DATA) is not
+available yet.
 
-## Bank 2: Filter
+## Bank 2 - Receiver
 
-| Key | Short | Long | Double-click |
-| --- | --- | --- | --- |
-| `0` | Announce Notch width | Notch width forward | Notch width backward |
-| `1` | Noise Reduction status | Noise Reduction on/off | No function |
-| `2` | Noise Blanker status | Noise Blanker on/off | No function |
-| `3` | Notch status | Notch on/off | No function |
-| `4` | Announce NR Level | NR Level +10 percent | NR Level -10 percent |
-| `5` | Announce NB Level | NB Level +10 percent | NB Level -10 percent |
-| `6` | Announce PBT 1 | PBT 1 +10 | PBT 1 -10 |
-| `7` | Announce PBT 2 | PBT 2 +10 | PBT 2 -10 |
-| `8` | Announce Filter Shape | Filter Shape sharp/soft toggle | No function |
-| `9` | Announce Filter Width | Filter Width forward | Filter Width backward |
-| `A` | Announce Preamp | Preamp forward | Preamp backward |
-| `B` | Announce Attenuator | Attenuator 0/20 dB toggle | No function |
-| `C` | Announce AGC | AGC forward | AGC backward |
-| `D` | Announce Filter Width and shape | No function | No function |
+| Key | Short | Long | Double | Short, then hold |
+|---|---|---|---|---|
+| `0` | auto notch | auto notch on/off | | |
+| `1` | noise reduction | on/off | NR level (focus) | NR level entry |
+| `2` | noise blanker | on/off | NB level (focus) | NB level entry |
+| `3` | notch (focus) | off, narrow, mid, wide | | |
+| `4` | PBT inner (focus) | PBT inner entry (`*` minus) | | |
+| `5` | filter 1-3 (focus) | next filter | filter shape | filter shape soft/sharp |
+| `6` | PBT outer (focus) | PBT outer entry | | |
+| `7` | AGC (focus) | AGC select: `2` fast, `4` mid, `3` slow | | |
+| `8` | preamp (focus) | next: off, 1, 2 | | |
+| `9` | attenuator (focus) | off / 20 dB | | |
 
-## Bank 3: VFO
+NR and NB levels in percent, steps of 5. PBT -128 to 127, steps of 10.
 
-| Key | Short | Long | Double-click |
-| --- | --- | --- | --- |
-| `0` | Announce Split status | Split on/off | No function |
-| `1` | Announce VFO A Frequency | Select VFO A | Enter VFO A Frequency |
-| `2` | Announce VFO B Frequency | Select VFO B | Enter VFO B Frequency |
-| `3` | No function | No function | No function |
-| `4` | Announce VFO A Mode | Enter VFO A Mode | No function |
-| `5` | Announce VFO B Mode | Enter VFO B Mode | No function |
-| `6` | Announce TX/RX status | No function | No function |
-| `7` | No function | No function | No function |
-| `8` | No function | No function | No function |
-| `9` | No function | No function | No function |
-| `A` | Select VFO A | No function | No function |
-| `B` | Select VFO B | No function | No function |
-| `C` | Swap VFO A/B | No function | No function |
-| `D` | No function | No function | No function |
+## Bank 3 - VFO and Split
 
-## Bank 4: Monitor
+| Key | Short | Long | Double |
+|---|---|---|---|
+| `0` | split | split on/off | TX frequency |
+| `1` | VFO A frequency | select VFO A | VFO A frequency entry |
+| `2` | VFO B frequency | select VFO B | VFO B frequency entry |
+| `4` | VFO A mode | VFO A mode select | |
+| `5` | VFO B mode | VFO B mode select | |
+| `6` | RX or TX | | |
+| `7` `8` `9` | band stack 1-3: not available yet | | |
 
-| Key | Short | Long | Double-click |
-| --- | --- | --- | --- |
-| `0` | Announce Tuner status | Tuner on/off | Start tuning |
-| `1` | Announce Monitor status | Monitor on/off | No function |
-| `2` | Announce Monitor Level | Monitor Level +10 percent | Monitor Level -10 percent |
-| `3` | Announce Transceive status | Transceive on/off | No function |
-| `4` | No function | No function | No function |
-| `5` | No function | No function | No function |
-| `6` | No function | No function | No function |
-| `7` | No function | No function | No function |
-| `8` | No function | No function | No function |
-| `9` | No function | No function | No function |
-| `A` | No function | No function | No function |
-| `B` | No function | No function | No function |
-| `C` | No function | No function | No function |
-| `D` | No function | No function | No function |
+## Bank 4 - Phone Transmit
 
-## Bank 5: RIT
+| Key | Short | Long | Double | Short, then hold |
+|---|---|---|---|---|
+| `0` | tuner | tuner on/off | tune | |
+| `1` | processor: not available yet | | | |
+| `2` | VOX: not available yet | | | |
+| `3` | monitor | on/off | monitor level (focus) | monitor level entry |
+| `4` `5` `6` | not available (TX low cut, equalizer, high cut) | | | |
+| `7` | mic gain: not available yet | | | |
+| `8` | RF power setting (focus) | RF power entry | | |
+| `9` | VOX delay: not available yet | | | |
 
-| Key | Short | Long | Double-click |
-| --- | --- | --- | --- |
-| `0` | Announce RIT status and offset | RIT on/off | RIT Offset to zero |
-| `1` | RIT -10 Hz | RIT -100 Hz | No function |
-| `2` | RIT +10 Hz | RIT +100 Hz | No function |
-| `3` | RIT Offset to zero | RIT off | RIT Offset to zero |
-| `4` | RIT -1 Hz | RIT -500 Hz | No function |
-| `5` | RIT +1 Hz | RIT +500 Hz | No function |
-| `6` | No function | No function | No function |
-| `7` | No function | No function | No function |
-| `8` | No function | No function | No function |
-| `9` | Announce RIT status | No function | No function |
-| `A` | No function | No function | No function |
-| `B` | No function | No function | No function |
-| `C` | No function | No function | No function |
-| `D` | No function | No function | No function |
+## Bank 5 - RIT
 
-## Bank 6: Repeater
+Home focus: the RIT offset.
 
-| Key | Short | Long | Double-click |
-| --- | --- | --- | --- |
-| `0` | Announce Duplex | Duplex forward: simplex/minus/plus | Duplex backward: simplex/plus/minus |
-| `1` | Repeater Tone status | Repeater Tone on/off | No function |
-| `2` | TSQL status | TSQL on/off | No function |
-| `3` | DTCS status | DTCS on/off | No function |
-| `4` | Announce Tone Mode | Tone Mode forward | No function |
-| `5` | Announce Digital Squelch | Digital Squelch forward | Digital Squelch backward |
-| `6` | No function | No function | No function |
-| `7` | No function | No function | No function |
-| `8` | No function | No function | No function |
-| `9` | No function | No function | No function |
-| `A` | No function | No function | No function |
-| `B` | No function | No function | No function |
-| `C` | No function | No function | No function |
-| `D` | No function | No function | No function |
+| Key | Short | Long | Double |
+|---|---|---|---|
+| `0` | RIT on/off and offset | RIT on/off | offset to 0 |
+| `1` / `2` | offset -10 / +10 Hz | -100 / +100 Hz | |
+| `3` | offset to 0 | RIT off | |
+| `4` / `5` | offset -1 / +1 Hz | -500 / +500 Hz | |
+| `A` `B` `C` | the offset; `B`/`C` 10 Hz, long 100 Hz; `A` long entry, `*` first for minus; `A` double 0 | | |
 
-## Bank 7: Memory, Scan, D-Star, GPS
+## Bank 6 - Repeater and Tone
 
-| Key | Short | Long | Double-click |
-| --- | --- | --- | --- |
-| `0` | Select Memory Mode | Memory Write, after `D` to confirm | No function |
-| `1` | Enter Memory Channel | No function | No function |
-| `2` | Memory copy to VFO | Memory Clear, after `D` to confirm | No function |
-| `3` | Scan Stop | No function | No function |
-| `4` | Program Memory Scan | Program Scan | No function |
-| `5` | Memory Scan | Select Memory Scan | No function |
-| `6` | Announce DV Data TX | DV Data TX PTT/Auto toggle | No function |
-| `7` | Announce DV Fast Data | DV Fast Data on/off | No function |
-| `8` | Announce GPS Select | GPS Select off/on/manual toggle | No function |
-| `9` | Announce GPS TX Mode | GPS TX Mode off/DPRS/NMEA toggle | No function |
-| `A` | No function | No function | No function |
-| `B` | No function | No function | No function |
-| `C` | No function | No function | No function |
-| `D` | No function | No function | No function |
+| Key | Short | Long | Double |
+|---|---|---|---|
+| `0` | repeater shift off | shift minus | shift plus |
+| `1` | repeater frequency: not available | | |
+| `2` | tone type: off or CTCSS | CTCSS | tone off |
+| `3` | CTCSS tone: not available yet | | |
+| `4` | DCS: not available | | |
+| `5` | encode only (TX) or encode and decode (both) | step between both and TX | |
 
-## Bank 8: CI-V Setup
+## Bank 7 - CW
 
-| Key | Short | Long | Double-click |
-| --- | --- | --- | --- |
-| `0` | No function | No function | No function |
-| `1` | Announce CI-V address | Enter CI-V address | No function |
-| `2` | Announce Baud rate | Baud rate forward | Baud rate backward |
-| `3` | No function | No function | No function |
-| `4` | No function | No function | No function |
-| `5` | No function | No function | No function |
-| `6` | No function | No function | No function |
-| `7` | No function | No function | No function |
-| `8` | No function | No function | No function |
-| `9` | No function | No function | No function |
-| `A` | No function | No function | No function |
-| `B` | No function | No function | No function |
-| `C` | No function | No function | No function |
-| `D` | No function | Save CI-V address and baud rate for this radio | No function |
+| Key | Short | Long | Double |
+|---|---|---|---|
+| `0` | tuner | tuner on/off | tune |
+| `8` | RF power setting (focus) | RF power entry | |
+| `1`-`7`, `9` | keyer, break-in, sidetone, paddle, CW pitch, weight, paddle reverse, break-in delay: not available yet | | |
 
-Baud-rate order: `4800`, `9600`, `19200`, `38400`, `115200`.
+## Bank 8 - Connection
 
-Changes made with keys `1` and `2` apply at once. Long `D` keeps them for the
-next start (in `~/.config/hampitrc/prefs.json`, per radio).
+Home focus: the baud rate.
 
-## Bank 9: System
+| Key | Short | Long |
+|---|---|---|
+| `1` | CI-V address | CI-V address entry (decimal, `D`) |
+| `2` | baud rate (focus) | baud rate pick: `1` the slowest, `2` the next … |
+| `3` | transceive | transceive on/off |
 
-| Key | Short | Long | Double-click |
-| --- | --- | --- | --- |
-| `0` | No function | No function | No function |
-| `1` | Next radio, connect to it | No function | No function |
-| `2` | Previous radio, connect to it | No function | No function |
-| `3` | No function | No function | No function |
-| `4` | Announce Tuning Speech status | Tuning Speech on/off | No function |
-| `5` | Announce Volume | No function | No function |
-| `6` | No function | No function | No function |
-| `7` | Set volume 1 | Volume -1 | No function |
-| `8` | Set volume 2 | Volume +1 | No function |
-| `9` | Set volume 3 | No function | No function |
-| `A` | Announce the active radio | No function | No function |
-| `B` | No function | No function | No function |
-| `C` | No function | No function | No function |
-| `D` | No function | No function | No function |
+`B`/`C` step the baud rate and go round. A changed address or baud rate is kept
+for the radio. Set the same on the radio.
 
-Radio order: IC-705, IC-7300, IC-7100. The chosen radio is remembered for the
-next start. If its serial port is not there, HamPiTRC says "selected, not
-connected"; press `1` or `2` again to go on.
+## Bank 9 - Profile and Speech
 
-Note: Volume functions currently manage the internal PiHAMTRC value. They do not change ALSA playback volume.
+Home focus: the profile.
+
+| Key | Short | Long | Double |
+|---|---|---|---|
+| `0` | experimental mode | on/off | |
+| `1` | profile (focus) | profile select: `1` IC-705, `2` IC-7300, `3` IC-7100 | profile reset (address and baud) |
+| `4` | tuning speech | on/off | |
+| `5` | verbose | on/off | |
+| `7` | volume (focus) | volume entry 1-9 | |
+| `8` | speech speed (focus) | next: slow, normal, fast | |
+
+With the profile as focus, `B` / `C` select the next / previous radio and
+connect to it. Verbose off gives values only ("40 percent" instead of "noise
+blanker 40 percent"). Experimental mode lets every key try its command, also
+where the profile switches it off; it is not saved. Volume, speed, verbose and
+the radio are kept for the next start.
+
+## Not on a key any more
+
+HamPiTRC 0.7.0 had memory, scan, D-STAR data, GPS, DTCS, tone mode and
+digital squelch keys. HamTRC has none of them, so they are off the keypad for
+now; the commands stay in `civ.py`.
