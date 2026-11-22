@@ -1,7 +1,6 @@
 # HamPiTRC-Experiment
 
-Talking transceiver controller by Jean Weber, LX1WJ, for a Raspberry Pi and
-Icom radios connected by USB. Everyday operation uses a USB numeric keypad and
+Talking transceiver controller by Jean Weber, LX1WJ, for a Raspberry Pi and radios connected by USB. Everyday operation uses a USB numeric keypad and
 spoken feedback, without a screen or web browser.
 
 HamPiTRC is the Raspberry Pi sister project of the
