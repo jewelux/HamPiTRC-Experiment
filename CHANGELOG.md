@@ -50,6 +50,8 @@
 - layout and documents as in HamTRC: `QUICKSTART.md`, `user-guide.md`,
   `builder-guide.md`, `CHANGELOG.md`, `docs/keypad-map.md` (was `KEYPAD.md`),
   `docs/radio-support-matrix.md`, `docs/radios/`
+- licences as in HamTRC: GPL-3.0 for code (`LICENSE`), CC BY-SA 4.0 for
+  documentation (`LICENSE-docs`)
 - tests moved to `tests/`, new tests for profiles, the capability gate,
   confirmations and keypad detection; legacy diagnostics in `tools/legacy/`
 

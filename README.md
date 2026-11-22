@@ -65,6 +65,8 @@ short sentence. `speech.py` renders it with Piper and plays it through ALSA.
 As in HamTRC: `main` holds the stable version, `development` integrates
 ongoing work, and larger or radio-specific changes get their own branch.
 
-## Licence
+## License
 
-To be added (see HamTRC for the code/documentation split used there).
+As in HamTRC: code under the GNU General Public License v3 (`LICENSE`),
+documentation under Creative Commons Attribution-ShareAlike 4.0
+(`LICENSE-docs`).
