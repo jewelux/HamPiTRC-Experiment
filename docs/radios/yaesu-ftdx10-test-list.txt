@@ -1,0 +1,65 @@
+HamPiTRC - FTDX10 test list (assisted field test)
+==================================================
+
+After HamTRC's yaesu-ftdx10-blind-test-list.txt. Read aloud or with a screen
+reader. Mark each line OK, WRONG (what was said / what the radio did) or N/A.
+
+Radio: FTDX10   Date: ____________   Tester: ____________
+
+Profile
+[ ] Bank 9, key 1 long, 4, D - "F T D X ten connected"
+[ ] Bank 9, key 1 short - says the FTDX10
+
+Safe first checks (receive only)
+[ ] Bank 1, key 0 short - frequency
+[ ] Bank 1, key 0 long, 14*074, D - radio goes to 14.074 MHz
+[ ] Bank 1, key 9 short - mode
+[ ] Bank 1, key 9 long, 2, D - radio goes to USB
+[ ] Bank 1, key 7 short - S meter, compare with the radio's meter
+[ ] Bank 1, key 3 short / long - lock state / toggle lock
+
+Receive
+[ ] Bank 2, key 1 short / long - noise reduction / toggle
+[ ] Bank 2, key 1 double - NR level 1 to 15; then B / C - up / down
+[ ] Bank 2, key 2 short / long / double - noise blanker, toggle, NB level 0 to 10
+[ ] Bank 2, key 3 short / long - notch / toggle
+[ ] Bank 2, key 0 short / long - auto notch / toggle
+[ ] Bank 2, key 7 long, 2, D - AGC fast
+[ ] Bank 2, key 8 long - next preamp: IPO, AMP 1, AMP 2
+[ ] Bank 2, key 9 long - next attenuator: off, 6, 12, 18 dB
+
+VFO and split
+[ ] Bank 3, key 1 long / key 2 long - select VFO A / VFO B on the radio
+[ ] Bank 3, key 2 short - VFO B frequency
+[ ] Bank 3, key 5 short - VFO B mode (the radio switches to B and back)
+[ ] Bank 3, key 0 short / long - split / toggle
+
+Tuner and power (dummy load)
+[ ] Bank 4, key 0 short / long / double - tuner, toggle, tune
+[ ] Bank 1, key 6 short - RF power in watts
+[ ] Bank 1, key 6, then B, then D - RF power plus 5 W
+[ ] Bank 1, key 4 / 8 / 5 while transmitting - output power, SWR, ALC
+
+Phone transmit
+[ ] Bank 4, key 1 short / long / double - processor, toggle, level
+[ ] Bank 4, key 2 short / long / double - VOX, toggle, gain
+[ ] Bank 4, key 7 short - mic gain
+[ ] Bank 4, key 9 short - VOX delay; B / C step it
+
+CW
+[ ] Bank 7, key 1 short / long - keyer / toggle; double - keyer speed
+[ ] Bank 7, key 2 short / long - break-in / toggle
+[ ] Bank 7, key 5 short - CW pitch; B / C step 10 Hz
+[ ] Bank 7, key 9 short - break-in delay
+
+FM, repeater and tone (on 29 MHz or 50 MHz FM)
+[ ] Bank 6, key 0 short / long / double - shift off / minus / plus
+[ ] Bank 6, key 2 long - tone CTCSS; key 5 long - between TX and both
+[ ] Bank 6, key 3 short - CTCSS tone; B / C - next tone
+
+Radio
+[ ] Bank 8, key 4 short - power state
+[ ] Bank 8, key 5 short - radio ID, four digits
+[ ] Bank 8, key 1 - "C I V address not available"
+
+Notes:

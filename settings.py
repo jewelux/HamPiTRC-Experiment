@@ -51,14 +51,17 @@ class Setting:
         if self.kind == 'list':
             names = [n for _d, n in self.choices()]
             return names[value] if 0 <= value < len(names) else str(value)
-        return number_words(value, self.point_digits) + self.unit
+        unit = self.unit() if callable(self.unit) else self.unit
+        return number_words(value, self.point_digits) + unit
 
     def stepped(self, value, direction):
         lo, hi = self.limits()
-        if self.step_fn:
-            new = self.step_fn(value, direction)
+        step_fn = self.step_fn
+        if step_fn:
+            new = step_fn(value, direction)
         else:
-            new = value + direction * self.step
+            step = self.step() if callable(self.step) else self.step
+            new = value + direction * step
         if self.kind == 'list' and self.wrap:
             return lo + (new - lo) % (hi - lo + 1)
         return new
@@ -84,7 +87,14 @@ def _rf_max_tenths():
     return radio.current().rf_power_max_watts * 10
 
 
+def _rf_min_tenths():
+    return 0 if radio.is_civ() else 50        # Yaesu PC: 5..100 W
+
+
 def _rf_read():
+    if not radio.is_civ():
+        w = radio.get_rf_power_watts()
+        return None if w is None else w * 10
     raw = radio.get_rf_power()
     if raw is None:
         return None
@@ -92,6 +102,9 @@ def _rf_read():
 
 
 def _rf_write(tenths):
+    if not radio.is_civ():
+        radio.set_rf_power_watts(round(tenths / 10))
+        return _rf_read()
     raw = round(max(0, tenths) * 255 / _rf_max_tenths())
     radio.set_rf_power(min(255, raw))
     return _rf_read()
@@ -111,7 +124,7 @@ def _rf_text(tenths):
 
 # HamTRC mode digits; DV on 0 is a HamPiTRC extension (IC-705, IC-7100).
 MODE_DIGITS = (('1', 'LSB'), ('2', 'USB'), ('3', 'CW'), ('4', 'AM'), ('5', 'FM'),
-               ('7', 'RTTY'), ('8', 'CW-R'), ('9', 'RTTY-R'), ('0', 'DV'))
+               ('6', 'DATA'), ('7', 'RTTY'), ('8', 'CW-R'), ('9', 'RTTY-R'), ('0', 'DV'))
 
 
 def mode_choices():
@@ -190,15 +203,85 @@ def _preamp_choices():
 
 
 def _att_choices():
-    return [('0', 'off'), ('1', '20 dB')]
+    if radio.is_civ():
+        return [('0', 'off'), ('1', '20 dB')]
+    return [('0', 'off'), ('1', '6 dB'), ('2', '12 dB'), ('3', '18 dB')]
 
 
-AGC_CODES = (1, 2, 3)
+def _att_codes():
+    return (0, 20) if radio.is_civ() else (0, 1, 2, 3)
 
 
+# HamTRC AGC digits: 0 off, 1 auto, 2 fast, 3 slow, 4 mid. Icom has fast, mid,
+# slow (16 12: 1, 2, 3); Yaesu all five (GT0: 0 off, 1 fast, 2 mid, 3 slow, 4 auto).
 def _agc_choices():
-    # HamTRC AGC digits: 0 off, 1 auto, 2 fast, 3 slow, 4 mid; Icom has fast, mid, slow.
-    return [('2', 'fast'), ('4', 'mid'), ('3', 'slow')]
+    if radio.is_civ():
+        return [('2', 'fast'), ('4', 'mid'), ('3', 'slow')]
+    return [('0', 'off'), ('2', 'fast'), ('4', 'mid'), ('3', 'slow'), ('1', 'auto')]
+
+
+def _agc_codes():
+    return (1, 2, 3) if radio.is_civ() else (0, 1, 2, 3, 4)
+
+
+def _break_in_choices():
+    if radio.is_civ():
+        return [('0', 'off'), ('1', 'semi'), ('2', 'full')]
+    return [('0', 'off'), ('1', 'on')]
+
+
+def _break_in_codes():
+    return (0, 1, 2) if radio.is_civ() else (0, 1)
+
+
+def _codes_setting(get, put, codes):
+    """A list setting whose radio values are codes()[index]."""
+    def read():
+        v = getattr(radio, get)()
+        c = codes()
+        return c.index(v) if v in c else None
+
+    def write(i):
+        getattr(radio, put)(codes()[i])
+        return read()
+    return read, write
+
+
+# NR and NB levels: percent on Icom, the radio's own steps on Yaesu
+# (FTDX10 NR 1-15, NB 0-10), as HamTRC.
+def _rx_level(kind):
+    icom_get, icom_put = 'get_%s_level_percent' % kind, 'set_%s_level_percent' % kind
+    yaesu_get, yaesu_put = 'get_%s_level' % kind, 'set_%s_level' % kind
+
+    def read():
+        return getattr(radio, icom_get if radio.is_civ() else yaesu_get)()
+
+    def write(v):
+        getattr(radio, icom_put if radio.is_civ() else yaesu_put)(v)
+        return read()
+
+    def lo():
+        return 0 if radio.is_civ() else (1 if kind == 'nr' else 0)
+
+    def hi():
+        return 100 if radio.is_civ() else (15 if kind == 'nr' else 10)
+    return dict(read=read, write=write, min=lo, max=hi,
+                step=lambda: 5 if radio.is_civ() else 1,
+                unit=lambda: ' percent' if radio.is_civ() else '')
+
+
+def _delay_step_fn(value, d):
+    """VOX/CW delay: 100 ms on Icom, the Yaesu step table elsewhere."""
+    if radio.is_civ():
+        return value + 100 * d
+    import yaesu_cat
+    steps = yaesu_cat.DELAY_STEPS
+    i = yaesu_cat.delay_step_of(value) + d
+    if i < 0:
+        return steps[0] - 1
+    if i >= len(steps):
+        return steps[-1] + 1
+    return steps[i]
 
 
 def _filter_choices():
@@ -263,31 +346,31 @@ def _ctcss_text(tenths):
 
 def build(ui):
     """The settings, given the ui (for volume, speed and profile switching)."""
-    nr_r, nr_w = _pair('get_nr_level_percent', 'set_nr_level_percent')
-    nb_r, nb_w = _pair('get_nb_level_percent', 'set_nb_level_percent')
     p1_r, p1_w = _pair('get_pbt1', 'set_pbt1')
     p2_r, p2_w = _pair('get_pbt2', 'set_pbt2')
     mon_r, mon_w = _pair('get_monitor_level_percent', 'set_monitor_level_percent')
     rit_r, rit_w = _pair('get_rit_offset_hz', 'set_rit_offset_hz')
     flt_r, flt_w = _list_index('get_filter_width', 'set_filter_width', (1, 2, 3))
     pre_r, pre_w = _list_index('get_preamp', 'set_preamp', (0, 1, 2))
-    att_r, att_w = _list_index('get_att', 'set_att', (0, 20))
-    agc_r, agc_w = _list_index('get_agc', 'set_agc', AGC_CODES)
+    att_r, att_w = _codes_setting('get_att', 'set_att', _att_codes)
+    agc_r, agc_w = _codes_setting('get_agc', 'set_agc', _agc_codes)
     level = dict(min=0, max=100, step=5, unit=' percent')
     proc_r, proc_w = _pair('get_proc_level_percent', 'set_proc_level_percent')
     voxg_r, voxg_w = _pair('get_vox_gain_percent', 'set_vox_gain_percent')
     mic_r, mic_w = _pair('get_mic_gain_percent', 'set_mic_gain_percent')
     voxd_r, voxd_w = _pair('get_vox_delay_ms', 'set_vox_delay_ms')
     pitch_r, pitch_w = _pair('get_cw_pitch_hz', 'set_cw_pitch_hz')
-    bk_r, bk_w = _list_index('get_break_in', 'set_break_in', (0, 1, 2))
+    bk_r, bk_w = _codes_setting('get_break_in', 'set_break_in', _break_in_codes)
+    ks_r, ks_w = _pair('get_cw_speed', 'set_cw_speed')
+    sd_r, sd_w = _pair('get_cw_delay_ms', 'set_cw_delay_ms')
     items = [
         Setting('rf_power', 'power', cap='rf_power', read=_rf_read, write=_rf_write,
-                min=0, max=_rf_max_tenths, step_fn=_rf_step, scale=10, text=_rf_text,
+                min=_rf_min_tenths, max=_rf_max_tenths, step_fn=_rf_step, scale=10, text=_rf_text,
                 confirm=True),
         Setting('mode', 'mode', 'list', cap='mode', read=_mode_read, write=_mode_write,
                 choices=mode_choices, wrap=True, big_steps=0, confirm=True),
-        Setting('nr_level', 'noise reduction level', cap='nr_level', read=nr_r, write=nr_w, **level),
-        Setting('nb_level', 'noise blanker level', cap='nb_level', read=nb_r, write=nb_w, **level),
+        Setting('nr_level', 'noise reduction level', cap='nr_level', **_rx_level('nr')),
+        Setting('nb_level', 'noise blanker level', cap='nb_level', **_rx_level('nb')),
         Setting('notch', 'notch filter', 'list', cap='notch', read=_notch_read, write=_notch_write,
                 choices=_notch_choices, big_steps=1),
         Setting('pbt_inner', 'P B T one', cap='pbt', read=p1_r, write=p1_w,
@@ -308,11 +391,16 @@ def build(ui):
         Setting('vox_gain', 'vox gain', cap='vox', read=voxg_r, write=voxg_w, **level),
         Setting('mic_gain', 'mic gain', cap='mic_gain', read=mic_r, write=mic_w, **level),
         Setting('vox_delay', 'vox delay', cap='vox_delay', read=voxd_r, write=voxd_w,
-                min=0, max=2000, step=100, unit=' milliseconds'),
+                min=lambda: 0 if radio.is_civ() else 30, max=lambda: 2000 if radio.is_civ() else 3000,
+                step_fn=_delay_step_fn, unit=' milliseconds'),
         Setting('cw_pitch', 'C W pitch', cap='cw_pitch', read=pitch_r, write=pitch_w,
-                min=300, max=900, step=10, unit=' hertz'),
+                min=300, max=lambda: 900 if radio.is_civ() else 1050, step=10, unit=' hertz'),
         Setting('break_in', 'break in', 'list', cap='break_in', read=bk_r, write=bk_w,
-                choices=lambda: [('0', 'off'), ('1', 'semi'), ('2', 'full')], big_steps=1),
+                choices=_break_in_choices, big_steps=1),
+        Setting('cw_speed', 'keyer speed', cap='cw_speed', read=ks_r, write=ks_w,
+                min=4, max=60, unit=' words per minute'),
+        Setting('cw_delay', 'break in delay', cap='cw_delay', read=sd_r, write=sd_w,
+                min=30, max=3000, step_fn=_delay_step_fn, unit=' milliseconds'),
         Setting('ctcss', 'C T C S S tone', cap='ctcss', read=lambda: radio.get_ctcss_tenths(),
                 write=_ctcss_write, min=670, max=2541, step_fn=_ctcss_step, point_digits=1,
                 text=_ctcss_text),

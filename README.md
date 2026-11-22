@@ -26,6 +26,7 @@ spoken startup name is still PiHAMTRC.
 | Icom IC-705 | **tested on hardware**: Raspberry Pi 5, USB numeric keypad, PC speakers, demonstrated live |
 | Icom IC-7300 | profile ready, not tested on a radio yet |
 | Icom IC-7100 | conservative first profile, not tested on a radio yet |
+| Yaesu FTDX10 | commands from HamTRC, assisted field test pending |
 
 The IC-705 test was done with the 0.7.0 layout. The HamTRC layout of
 0.8.0-dev is new and needs a test on the radio.
@@ -57,8 +58,9 @@ and plays it through ALSA; a new key press stops it.
 | `ui.py` | carries out key actions: speech, entries, A/B/C focus steps |
 | `settings.py` | the settings A, B and C act on: range, steps, read, write |
 | `radio.py` | active radio: profile selection, capability gate, prefs file |
-| `radio_profiles.py` | built-in radio profiles (IC-705, IC-7300, IC-7100) |
+| `radio_profiles.py` | built-in radio profiles (IC-705, IC-7300, IC-7100, FTDX10) |
 | `civ.py` | Icom CI-V protocol (formerly `ic705.py`) |
+| `yaesu_cat.py` | Yaesu ASCII CAT protocol (FTDX10) |
 | `speech.py` | Piper speech output |
 | `keymap.py` | USB keypad keycodes -> HamTRC logical keys |
 | `config.py` | station settings: first radio, serial ports, keypad, audio, voice |

@@ -61,8 +61,14 @@ class Capabilities:
     mic_gain: bool = False        # 14 0B
     vox_delay: bool = False       # 1A 05 <vox_delay_menu_item>
     # Bank 7: CW
-    break_in: bool = False        # 16 47 off / semi / full
-    cw_pitch: bool = False        # 14 09
+    break_in: bool = False        # 16 47 off / semi / full; Yaesu BI on / off
+    cw_pitch: bool = False        # 14 09; Yaesu KP
+    keyer: bool = False           # Yaesu KR (Icom: none over CI-V)
+    cw_speed: bool = False        # Yaesu KS
+    cw_delay: bool = False        # Yaesu SD
+    # Bank 8: Yaesu radio power switch and ID
+    power_switch: bool = False    # PS
+    radio_id: bool = False        # ID
     # Bank 3: band stack
     band_stack: bool = False      # 1A 01
     # Bank 5: RIT
@@ -102,7 +108,9 @@ FEATURE_NAMES = {
     'duplex': 'Duplex', 'repeater_tone': 'Repeater tone', 'tsql': 'TSQL',
     'dtcs': 'DTCS', 'ctcss': 'C T C S S tone', 'proc': 'Processor', 'vox': 'VOX',
     'mic_gain': 'Mic gain', 'vox_delay': 'VOX delay', 'break_in': 'Break in',
-    'cw_pitch': 'C W pitch', 'band_stack': 'Band stack', 'tone_squelch_mode': 'Tone mode',
+    'cw_pitch': 'C W pitch', 'band_stack': 'Band stack', 'keyer': 'Keyer',
+    'cw_speed': 'Keyer speed', 'cw_delay': 'Break in delay', 'power_switch': 'Power switch',
+    'radio_id': 'Radio I D', 'tone_squelch_mode': 'Tone mode',
     'dsql_csql': 'Digital squelch', 'memory': 'Memory',
     'memory_clear': 'Memory clear', 'scan': 'Scan', 'dv_data': 'DV data',
     'gps': 'GPS', 'alc_meter': 'ALC meter', 'comp_meter': 'Compression meter',
@@ -114,6 +122,8 @@ MODE_CODES = {
     'LSB': 0x00, 'USB': 0x01, 'AM': 0x02, 'CW': 0x03, 'RTTY': 0x04,
     'FM': 0x05, 'WFM': 0x06, 'CW-R': 0x07, 'RTTY-R': 0x08, 'DV': 0x17,
 }
+# Modes only some protocols have (Yaesu DATA); listed so profiles may name them.
+OTHER_MODES = ('DATA',)
 
 CIV_BAUDS = (4800, 9600, 19200, 38400, 57600, 115200)
 
@@ -132,6 +142,7 @@ class RadioProfile:
     transceive_menu_item: int = 0  # 1A 05 menu number of "CI-V Transceive"
     rf_power_max_watts: int = 100  # RF power 14 0A: 255 is this many watts
     vox_delay_menu_item: int = 0   # 1A 05 menu number of the VOX delay
+    protocol: str = 'civ'          # 'civ' (Icom) or 'yaesu' (Yaesu ASCII CAT)
     status: str = 'not tested'     # hardware status, as in the support matrix
     notes: str = ''
 
@@ -192,6 +203,22 @@ IC7100_CAPS = Capabilities(
 
 HF_MODES = ('LSB', 'USB', 'CW', 'FM', 'AM', 'RTTY', 'CW-R', 'RTTY-R')
 
+# --- Yaesu FTDX10 --------------------------------------------------------------
+# ASCII CAT, HamTRC's FTDX10 profile (radio_profile_table.cpp, development):
+# every command as the FTDX10 CAT manual and Hamlib newcat have it. HamTRC
+# hides band stack, RIT, transceive and monitor on the FTDX10.
+FTDX10_CAPS = Capabilities(
+    freq=True, mode=True, smeter=True, power_meter=True, rf_power=True,
+    swr=True, tx_status=True, tx_freq=True, lock=True, alc_meter=True,
+    auto_notch=True, nr=True, nr_level=True, nb=True, nb_level=True, notch=True,
+    preamp=True, att=True, agc=True,
+    vfo=True, split=True, vfo_b_direct=True, tuner=True,
+    duplex=True, repeater_tone=True, tsql=True, ctcss=True,
+    proc=True, vox=True, mic_gain=True, vox_delay=True,
+    break_in=True, cw_pitch=True, keyer=True, cw_speed=True, cw_delay=True,
+    power_switch=True, radio_id=True,
+)
+
 PROFILES = (
     RadioProfile(
         key='ic705', name='Icom IC-705', spoken='I C seven oh five',
@@ -215,6 +242,14 @@ PROFILES = (
         serial_port='/dev/ttyUSB0', caps=IC7100_CAPS,
         modes=HF_MODES + ('WFM', 'DV'),
         notes='Conservative first block from Hamlib ic7100.c.',
+    ),
+    RadioProfile(
+        key='ftdx10', name='Yaesu FTDX10', spoken='F T D X ten',
+        civ_addr=0, baud=38400, bauds=(4800, 9600, 19200, 38400),
+        serial_port='/dev/ttyUSB0', caps=FTDX10_CAPS,
+        modes=HF_MODES + ('DATA',), protocol='yaesu',
+        status='assisted field test pending',
+        notes='Commands from HamTRC; USB "Enhanced COM" port, menu CAT RATE.',
     ),
 )
 
@@ -244,16 +279,18 @@ def validate():
         if p.key in seen:
             problems.append(p.key + ': duplicate key')
         seen.add(p.key)
-        if not 0 < p.civ_addr < 0xE0:
+        if p.protocol not in ('civ', 'yaesu'):
+            problems.append(p.key + ': unknown protocol')
+        if p.protocol == 'civ' and not 0 < p.civ_addr < 0xE0:
             problems.append(p.key + ': CI-V address out of range')
         if p.baud not in p.bauds:
             problems.append(p.key + ': default baud not in bauds')
         for m in p.modes:
-            if m not in MODE_CODES:
+            if m not in MODE_CODES and m not in OTHER_MODES:
                 problems.append(p.key + ': unknown mode ' + m)
-        if p.caps.transceive and not p.transceive_menu_item:
+        if p.protocol == 'civ' and p.caps.transceive and not p.transceive_menu_item:
             problems.append(p.key + ': transceive without menu item')
-        if p.caps.vox_delay and not p.vox_delay_menu_item:
+        if p.protocol == 'civ' and p.caps.vox_delay and not p.vox_delay_menu_item:
             problems.append(p.key + ': vox delay without menu item')
         if p.caps.memory_clear and not p.caps.memory:
             problems.append(p.key + ': memory_clear without memory')

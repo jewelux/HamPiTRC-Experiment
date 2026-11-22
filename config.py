@@ -3,12 +3,13 @@
 
 # Radio used on the very first start. Afterwards Bank 9 (keys 1 and 2)
 # switches radios and the choice is remembered in ~/.config/hampitrc/prefs.json.
-# One of: 'ic705', 'ic7300', 'ic7100'
+# One of: 'ic705', 'ic7300', 'ic7100', 'ftdx10'
 RADIO_PROFILE   = 'ic705'
 
 # Serial port per radio. Leave a radio out to use its profile default
-# (IC-705 /dev/ttyACM0, IC-7300 and IC-7100 /dev/ttyUSB0). With more than one
-# radio connected, the stable names under /dev/serial/by-id/ are safer.
+# (IC-705 /dev/ttyACM0, IC-7300, IC-7100 and FTDX10 /dev/ttyUSB0). With more
+# than one radio connected, the stable names under /dev/serial/by-id/ are
+# safer. FTDX10: the Enhanced COM port (by-id name ending in -if00-port0).
 SERIAL_PORTS = {
     'ic705': '/dev/ttyACM0',
 }

@@ -476,14 +476,24 @@ def bank6(ui, key):
 # --- Bank 7: CW ---------------------------------------------------------------------------------
 
 def bank7(ui, key):
-    # Icom: break-in off, semi, full and the CW pitch; the rest is FT-8x7 and
-    # Yaesu in HamTRC and says "not available".
-    names = {'1': 'keyer', '3': 'sidetone', '4': 'paddle',
-             '6': 'C W weight', '7': 'paddle reverse', '9': 'break in delay'}
+    # Icom: break-in off, semi, full and the CW pitch. FTDX10: also the keyer
+    # with its speed and the break-in delay. The rest is FT-8x7 in HamTRC.
+    names = {'3': 'sidetone', '4': 'paddle', '6': 'C W weight', '7': 'paddle reverse'}
     if key == '0':
         return tuner_key(ui)
+    if key == '1':
+        if radio.has('keyer'):
+            return switch_with_level(ui, 'keyer', 'keyer', 'get_keyer', 'set_keyer', 'cw_speed')
+        return not_available(ui, 'keyer')
     if key == '2':
-        return list_key(ui, 'break_in')
+        if radio.is_civ():
+            return list_key(ui, 'break_in')
+        b = list_key(ui, 'break_in')      # Yaesu: on/off, no focus (HamTRC)
+        b.focus = None
+        b.help[HOLD] = toggle_('break in')
+        return b
+    if key == '9':
+        return setting_key(ui, 'cw_delay')
     if key == '5':
         return setting_key(ui, 'cw_pitch')
     if key == '8':
@@ -497,6 +507,9 @@ def bank7(ui, key):
 
 def bank8(ui, key):
     if key == '1':
+        if not radio.is_civ():
+            return not_available(ui, 'C I V address')
+
         def say():
             ui.value('C I V address', str(radio.get_civ_address()))
 
@@ -514,6 +527,24 @@ def bank8(ui, key):
         return setting_key(ui, 'baud')
     if key == '3':
         return switch_key(ui, 'transceive', 'transceive', 'get_transceive', 'set_transceive')
+    if key == '4' and radio.has('power_switch'):
+        def say():
+            on = radio.get_power_state()
+            ui.say('power unavailable') if on is None else ui.switch('power', on)
+
+        def off():
+            radio.set_power_state(False)
+            ui.say('power off')
+
+        def on():
+            radio.set_power_state(True)
+            ui.say('power on')
+        return B(say, off, on, short_help='power', hold_help='power off', double_help='power on')
+    if key == '5' and radio.has('radio_id'):
+        def rid():
+            v = radio.get_radio_id()
+            ui.say('radio I D unavailable') if not v else ui.value('radio I D', ' '.join(v))
+        return B(rid, short_help='radio I D')
     return None
 
 

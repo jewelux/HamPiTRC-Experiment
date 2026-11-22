@@ -30,8 +30,10 @@ class ProfileTableTests(unittest.TestCase):
 
     def test_ic705_keeps_everything_of_0_7_0(self):
         caps = get_profile('ic705').caps
+        yaesu_only = {'keyer', 'cw_speed', 'cw_delay', 'power_switch', 'radio_id'}
         for name in radio_profiles.capability_names():
-            self.assertTrue(getattr(caps, name), name)
+            if name not in yaesu_only:
+                self.assertTrue(getattr(caps, name), name)
 
     def test_hf_radio_has_no_dstar(self):
         caps = get_profile('ic7300').caps
@@ -40,10 +42,17 @@ class ProfileTableTests(unittest.TestCase):
         self.assertFalse(caps.gps)
         self.assertNotIn('DV', get_profile('ic7300').modes)
 
-    def test_every_gated_function_exists_in_civ(self):
+    def test_every_gated_function_exists_somewhere(self):
+        import yaesu_cat
         for name, feature in radio.FEATURE_OF.items():
-            self.assertTrue(hasattr(civ, name), name)
+            self.assertTrue(hasattr(civ, name) or hasattr(yaesu_cat, name), name)
             self.assertIn(feature, radio_profiles.capability_names(), name)
+
+    def test_every_yaesu_capability_has_its_functions(self):
+        import yaesu_cat
+        for fn in ('get_freq', 'get_mode', 'get_nr', 'get_nr_level', 'get_agc', 'get_att',
+                   'get_ctcss_tenths', 'get_keyer', 'get_cw_speed', 'get_power_state'):
+            self.assertTrue(hasattr(yaesu_cat, fn), fn)
 
 
 if __name__ == '__main__':

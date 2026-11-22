@@ -177,7 +177,7 @@ Home focus: the profile.
 | Key | Short | Long | Double |
 |---|---|---|---|
 | `0` | experimental mode | on/off | |
-| `1` | profile (focus) | profile select: `1` IC-705, `2` IC-7300, `3` IC-7100 | profile reset (address and baud) |
+| `1` | profile (focus) | profile select: `1` IC-705, `2` IC-7300, `3` IC-7100, `4` FTDX10 | profile reset (address and baud) |
 | `4` | tuning speech | on/off | |
 | `5` | verbose | on/off | |
 | `7` | volume (focus) | volume entry 1-9 | |
@@ -188,6 +188,13 @@ connect to it. Verbose off gives values only ("40 percent" instead of "noise
 blanker 40 percent"). Experimental mode lets every key try its command, also
 where the profile switches it off; it is not saved. Volume, speed, verbose and
 the radio are kept for the next start.
+
+## FTDX10
+
+The FTDX10 has the same layout; HamTRC's FTDX10 column. What differs (levels in
+the radio's own steps, keyer and break-in delay on Bank 7, radio power and ID
+on Bank 8, no RIT, PBT or band stack) is listed in
+[radios/yaesu-ftdx10.md](radios/yaesu-ftdx10.md).
 
 ## Not on a key any more
 

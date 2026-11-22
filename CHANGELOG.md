@@ -2,6 +2,20 @@
 
 ## Unreleased (development, 0.8.0-dev)
 
+### Yaesu FTDX10
+
+- **new protocol** `yaesu_cat.py` (Yaesu ASCII CAT) beside `civ.py`;
+  `radio.py` routes each call by the profile's `protocol`
+- FTDX10 profile from HamTRC's development branch: commands and encodings as
+  checked there against the FTDX10 CAT manual and Hamlib; status "assisted
+  field test pending"
+- same keypad layout as the Icoms (HamTRC's FTDX10 column): NR/NB levels in
+  the radio's steps, five AGC speeds, attenuator 6/12/18 dB, RF power 5-100 W,
+  DATA mode (digit `6`), keyer and keyer speed, break-in on/off and delay, radio
+  power switch and ID on Bank 8; RIT, PBT, filter, monitor, transceive and band
+  stack say "not available", as HamTRC hides them
+- `docs/radios/yaesu-ftdx10.md` and a test list
+
 ### Transmit, CW, tone and band stack (Icom)
 
 - Bank 4: processor and level, VOX and gain, mic gain, VOX delay (IC-705

@@ -32,6 +32,7 @@ settings.py          settings for A/B/C, entries and picks (HamTRC SettingOps)
 radio.py             active radio, capability gate, prefs file
 radio_profiles.py    built-in radio profiles
 civ.py               Icom CI-V protocol
+yaesu_cat.py         Yaesu ASCII CAT protocol (FTDX10)
 speech.py            Piper speech output
 keymap.py            keycodes and bank names
 config.py            station settings
@@ -68,6 +69,16 @@ Keys are in `banks.py`, one function per bank. Helpers build the usual kinds:
 with an action needs a help text; `tests/test_keypad_banks.py` runs every key,
 gesture and radio and checks that.
 
+## Protocols
+
+`radio.py` sends each call to the protocol module of the active profile:
+`civ.py` for `protocol='civ'`, `yaesu_cat.py` for `protocol='yaesu'`. Both use
+the same function names and units (frequency in Hz, levels where the radio
+has percent in percent, tones in tenths of a Hz). A function a protocol does
+not have is simply missing there, and the key says "not available". Where the
+radios count differently (NR level percent on Icom, 1-15 on the FTDX10; RF
+power raw on Icom, watts on Yaesu), `settings.py` asks `radio.is_civ()`.
+
 ## Add a radio
 
 1. **Sources first.** Take the radio's CI-V reference guide and Hamlib's
@@ -83,6 +94,9 @@ gesture and radio and checks that.
    `tests/test_profiles.py` fails if one of these is missing.
 4. **Tests.** Add the address and anything special to `tests/test_profiles.py`;
    frame checks go to `tests/test_civ_commands.py`.
+   A radio with another protocol (Kenwood, Elecraft, an FT-8x7) needs a module
+   like `yaesu_cat.py`, an entry in `radio.PROTOCOLS`, and its own encodings in
+   `settings.py`. HamTRC has them all; port from there.
 5. **Docs.** A row in `docs/radio-support-matrix.md`, a page
    `docs/radios/<vendor>-<model>.md`, a line in `CHANGELOG.md`, and the
    order in Bank 9 in `docs/keypad-map.md`.

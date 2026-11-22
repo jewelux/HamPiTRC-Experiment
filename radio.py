@@ -13,6 +13,7 @@ import json
 import os
 
 import civ
+import yaesu_cat
 import radio_profiles
 from radio_profiles import FEATURE_NAMES
 
@@ -105,6 +106,14 @@ FEATURE_OF = {
     'get_cw_pitch_hz': 'cw_pitch', 'set_cw_pitch_hz': 'cw_pitch',
     'get_ctcss_tenths': 'ctcss', 'set_ctcss_tenths': 'ctcss',
     'get_band_stack': 'band_stack', 'recall_band_stack': 'band_stack',
+    'get_keyer': 'keyer', 'set_keyer': 'keyer',
+    'get_cw_speed': 'cw_speed', 'set_cw_speed': 'cw_speed',
+    'get_cw_delay_ms': 'cw_delay', 'set_cw_delay_ms': 'cw_delay',
+    'get_power_state': 'power_switch', 'set_power_state': 'power_switch',
+    'get_radio_id': 'radio_id',
+    'get_nr_level': 'nr_level', 'set_nr_level': 'nr_level',
+    'get_nb_level': 'nb_level', 'set_nb_level': 'nb_level',
+    'get_rf_power_watts': 'rf_power', 'set_rf_power_watts': 'rf_power',
     'get_alc_meter_percent': 'alc_meter', 'get_comp_meter_percent': 'comp_meter',
     'get_voltage': 'vd_meter', 'get_current': 'id_meter',
 }
@@ -116,6 +125,12 @@ PREFS_PATH = os.path.expanduser(os.environ.get(
     'HAMPITRC_PREFS', '~/.config/hampitrc/prefs.json'))
 
 _profile = radio_profiles.get_profile(radio_profiles.DEFAULT_PROFILE)
+PROTOCOLS = {'civ': civ, 'yaesu': yaesu_cat}
+
+
+def proto():
+    """The protocol module of the active radio."""
+    return PROTOCOLS[_profile.protocol]
 _serial_ports = {}   # per-profile overrides from config.py
 
 
@@ -137,16 +152,19 @@ def has(feature):
 
 
 def __getattr__(name):
-    # Module-level proxy: radio.<civ function>, gated by FEATURE_OF.
-    target = getattr(civ, name)
+    # Module-level proxy: radio.<protocol function>, gated by FEATURE_OF.
+    if name.startswith('__'):
+        raise AttributeError(name)
     feature = FEATURE_OF.get(name)
     if feature is None:
-        return target
+        return getattr(proto(), name)
 
     def gated(*args, **kwargs):
-        if not has(feature):
+        module = proto()
+        target = getattr(module, name, None)
+        if target is None or not has(feature):
             raise NotAvailable(feature)
-        if not civ.is_connected():
+        if not module.is_connected():
             raise NotConnected()
         if name in _MODE_SETTERS and args:
             if str(args[0]).upper() not in _profile.modes:
@@ -155,6 +173,17 @@ def __getattr__(name):
 
     gated.__name__ = name
     return gated
+
+
+def is_civ():
+    return _profile.protocol == 'civ'
+
+
+def _configure(addr, baud):
+    if is_civ():
+        civ.configure(addr, baud, _profile.transceive_menu_item, _profile.vox_delay_menu_item)
+    else:
+        yaesu_cat.configure(baud)
 
 
 # --- prefs file: selected radio, and CI-V address / baud per radio ----------
@@ -198,10 +227,12 @@ def select(key, serial_ports=None, remember=True):
     global _profile, _serial_ports
     if serial_ports is not None:
         _serial_ports = dict(serial_ports)
+    civ.disconnect()
+    yaesu_cat.disconnect()
     _profile = radio_profiles.get_profile(key)
     prefs = load_prefs()
     addr, baud, _port = _link_for(_profile, prefs)
-    civ.configure(addr, baud, _profile.transceive_menu_item, _profile.vox_delay_menu_item)
+    _configure(addr, baud)
     if remember:
         prefs['profile'] = key
         save_prefs(prefs)
@@ -219,7 +250,8 @@ def start(default_key, serial_ports=None):
 def connect():
     """Open the active profile's serial port. Raises on failure."""
     civ.disconnect()
-    civ.connect(serial_port())
+    yaesu_cat.disconnect()
+    proto().connect(serial_port())
 
 
 def switch(step):
@@ -239,14 +271,16 @@ def reset_link():
     prefs = load_prefs()
     prefs.get('radios', {}).pop(_profile.key, None)
     save_prefs(prefs)
-    civ.configure(_profile.civ_addr, _profile.baud, _profile.transceive_menu_item,
-                  _profile.vox_delay_menu_item)
-    civ.set_baudrate(_profile.baud)
+    _configure(_profile.civ_addr, _profile.baud)
+    proto().set_baudrate(_profile.baud)
 
 
 def remember_link():
     """Save the running CI-V address and baud rate for the active radio."""
     prefs = load_prefs()
     radios = prefs.setdefault('radios', {})
-    radios[_profile.key] = {'civ_addr': civ.get_civ_address(), 'baud': civ.get_baudrate()}
+    link = {'baud': proto().get_baudrate()}
+    if is_civ():
+        link['civ_addr'] = civ.get_civ_address()
+    radios[_profile.key] = link
     return save_prefs(prefs)

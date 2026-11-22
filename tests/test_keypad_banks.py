@@ -239,12 +239,18 @@ class EveryKeyTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         radio.PREFS_PATH = os.path.join(self.tmp.name, 'prefs.json')
+        import yaesu_cat
         self.timeout, civ.QUERY_TIMEOUT = civ.QUERY_TIMEOUT, 0.01
         self.retries, civ.QUERY_RETRIES = civ.QUERY_RETRIES, 1
+        self.ytimeout, yaesu_cat.TIMEOUT = yaesu_cat.TIMEOUT, 0.01
+        self.yretries, yaesu_cat.RETRIES = yaesu_cat.RETRIES, 1
 
     def tearDown(self):
+        import yaesu_cat
         civ.QUERY_TIMEOUT, civ.QUERY_RETRIES = self.timeout, self.retries
+        yaesu_cat.TIMEOUT, yaesu_cat.RETRIES = self.ytimeout, self.yretries
         civ._ser = None
+        yaesu_cat._ser = None
         radio.set_experimental(False)
         self.tmp.cleanup()
 
@@ -272,7 +278,7 @@ class EveryKeyTests(unittest.TestCase):
                                               experimental=experimental):
                                 self.assertTrue(b.help.get(g), 'no help text')
                                 radio.select(key, remember=False)
-                                civ._ser = FakeSerial()
+                                radio.proto()._ser = FakeSerial()
                                 ui.run(action)
                                 if ui.keypad.entry is not None:
                                     ui.keypad.end_entry()
