@@ -24,12 +24,13 @@ SMETER_RAW_S9_PLUS_60 = 241
 
 _ser = None
 
-def configure(civ_addr, baudrate, transceive_menu_item=0):
-    """Take the address, baud rate and menu item of the active profile."""
-    global CIV_ADDR, BAUDRATE, TRANSCEIVE_MENU_ITEM
+def configure(civ_addr, baudrate, transceive_menu_item=0, vox_delay_menu_item=0):
+    """Take the address, baud rate and menu items of the active profile."""
+    global CIV_ADDR, BAUDRATE, TRANSCEIVE_MENU_ITEM, VOX_DELAY_MENU_ITEM
     CIV_ADDR = max(0, min(255, int(civ_addr)))
     BAUDRATE = int(baudrate)
     TRANSCEIVE_MENU_ITEM = int(transceive_menu_item)
+    VOX_DELAY_MENU_ITEM = int(vox_delay_menu_item)
 
 def connect(port):
     global _ser
@@ -798,3 +799,149 @@ def set_vfoa_mode(mode_name, filt=1):
 def set_vfob_mode(mode_name, filt=1):
     select_vfo_a()
     return set_selected_or_unselected_mode(0x01, mode_name, filt)
+
+
+# --- Stage 2: transmit, CW, tone and band stack (as HamTRC protocol_ops_civ.cpp) ---
+
+VOX_DELAY_MENU_ITEM = 0   # 1A 05 menu number of the VOX delay (profile)
+
+def get_proc():
+    value = _query_16_byte(0x44)
+    return None if value is None else value != 0x00
+
+def set_proc(on):
+    _set_16_byte(0x44, 0x01 if on else 0x00)
+
+def get_proc_level_percent():
+    return _raw_to_percent(_query_14_value(0x0E))
+
+def set_proc_level_percent(percent):
+    _set_14_value(0x0E, _percent_to_raw(percent))
+
+def get_vox():
+    value = _query_16_byte(0x46)
+    return None if value is None else value != 0x00
+
+def set_vox(on):
+    _set_16_byte(0x46, 0x01 if on else 0x00)
+
+def get_vox_gain_percent():
+    return _raw_to_percent(_query_14_value(0x16))
+
+def set_vox_gain_percent(percent):
+    _set_14_value(0x16, _percent_to_raw(percent))
+
+def get_mic_gain_percent():
+    return _raw_to_percent(_query_14_value(0x0B))
+
+def set_mic_gain_percent(percent):
+    _set_14_value(0x0B, _percent_to_raw(percent))
+
+def get_vox_delay_ms():
+    """1A 05 <item>: 00..20 in BCD, tenths of a second."""
+    raw = _query_menu_byte(0x05, VOX_DELAY_MENU_ITEM)
+    if raw is None:
+        return None
+    tenths = (raw >> 4) * 10 + (raw & 0x0F)
+    return tenths * 100 if 0 <= tenths <= 20 else None
+
+def set_vox_delay_ms(ms):
+    tenths = max(0, min(20, (int(ms) + 50) // 100))
+    _set_menu_byte(0x05, VOX_DELAY_MENU_ITEM, ((tenths // 10) << 4) | (tenths % 10))
+
+BREAK_IN = ('off', 'semi', 'full')   # 16 47: 00 off, 01 semi, 02 full
+
+def get_break_in():
+    value = _query_16_byte(0x47)
+    return value if value in (0, 1, 2) else None
+
+def set_break_in(value):
+    _set_16_byte(0x47, max(0, min(2, int(value))))
+
+def cw_pitch_raw_to_hz(raw):
+    raw = max(0, min(255, raw))
+    hz = 300 + (raw * 600 + 127) // 255
+    return (hz + 2) // 5 * 5
+
+def cw_pitch_hz_to_raw(hz):
+    hz = max(300, min(900, int(hz)))
+    return ((hz - 300) * 255 + 300) // 600
+
+def get_cw_pitch_hz():
+    raw = _query_14_value(0x09)
+    return None if raw is None else cw_pitch_raw_to_hz(raw)
+
+def set_cw_pitch_hz(hz):
+    _set_14_value(0x09, cw_pitch_hz_to_raw(hz))
+
+# The 50 standard CTCSS tones, in tenths of a Hz.
+CTCSS_TONES = (
+    670, 693, 719, 744, 770, 797, 825, 854, 885, 915,
+    948, 974, 1000, 1035, 1072, 1109, 1148, 1188, 1230, 1273,
+    1318, 1365, 1413, 1462, 1514, 1567, 1598, 1622, 1655, 1679,
+    1713, 1738, 1773, 1799, 1835, 1862, 1899, 1928, 1966, 1995,
+    2035, 2065, 2107, 2181, 2257, 2291, 2336, 2418, 2503, 2541,
+)
+
+def tone_encode(tenths):
+    tenths = max(0, min(9999, int(tenths)))
+    return [0x00, ((tenths // 1000) << 4) | ((tenths // 100) % 10),
+            (((tenths // 10) % 10) << 4) | (tenths % 10)]
+
+def tone_decode(data):
+    if len(data) < 3 or data[0] != 0x00:
+        return None
+    value = 0
+    for b in data[1:3]:
+        hi, lo = b >> 4, b & 0x0F
+        if hi > 9 or lo > 9:
+            return None
+        value = value * 100 + hi * 10 + lo
+    return value
+
+def get_ctcss_tenths():
+    """1B 00: the repeater tone."""
+    resp = _query(0x1B, [0x00])
+    if resp and len(resp) >= 4 and resp[0] == 0x00:
+        return tone_decode(resp[1:4])
+    return None
+
+def set_ctcss_tenths(tenths):
+    """1B 00 and 1B 01: repeater and TSQL tone alike (HamTRC)."""
+    for sub in (0x00, 0x01):
+        _flush()
+        _send(0x1B, [sub] + tone_encode(tenths))
+        time.sleep(0.05)
+        _ser.reset_input_buffer()
+
+def band_code(hz):
+    """Icom band stack band code of a frequency (HamTRC ui_console.cpp)."""
+    bands = ((1800000, 1999999, 0x01), (3400000, 4099999, 0x02), (6900000, 7499999, 0x03),
+             (9900000, 10499999, 0x04), (13900000, 14499999, 0x05), (17900000, 18499999, 0x06),
+             (20900000, 21499999, 0x07), (24400000, 25099999, 0x08), (28000000, 29999999, 0x09),
+             (50000000, 54000000, 0x0A))
+    for lo, hi, code in bands:
+        if lo <= hz <= hi:
+            return code
+    return 0x0B
+
+def get_band_stack(register):
+    """1A 01 <band> <register>: (hz, mode name, filter) of the current band."""
+    hz = get_freq()
+    if not hz:
+        return None
+    band = band_code(hz)
+    resp = _query(0x1A, [0x01, band, register])
+    if resp and len(resp) >= 10 and resp[0] == 0x01 and resp[1] == band and resp[2] == register:
+        return _bcd_to_freq(resp[3:8]), MODE_NAMES.get(resp[8], '?'), resp[9]
+    return None
+
+def recall_band_stack(register):
+    entry = get_band_stack(register)
+    if entry is None:
+        return None
+    hz, mode, filt = entry
+    set_freq(hz)
+    if mode in MODE_CODES:
+        set_mode(mode, filt if filt in (1, 2, 3) else 1)
+    return entry

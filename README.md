@@ -33,8 +33,6 @@ The IC-705 test was done with the 0.7.0 layout. The HamTRC layout of
 
 Known limitations:
 
-- Not yet on a key (stage 2): processor, VOX, mic gain, VOX delay, CW keys,
-  CTCSS tone, band stack. They say "not available".
 - Tuning speech (Bank 9 `4`) is a switch only; automatic dial announcements are
   not implemented.
 - No voice model, startup service or network transport is included.

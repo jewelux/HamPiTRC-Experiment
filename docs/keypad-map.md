@@ -102,20 +102,23 @@ NR and NB levels in percent, steps of 5. PBT -128 to 127, steps of 10.
 | `4` | VFO A mode | VFO A mode select | |
 | `5` | VFO B mode | VFO B mode select | |
 | `6` | RX or TX | | |
-| `7` `8` `9` | band stack 1-3: not available yet | | |
+| `7` `8` `9` | band stack 1-3 of the current band | recall it (frequency and mode) | |
 
 ## Bank 4 - Phone Transmit
 
 | Key | Short | Long | Double | Short, then hold |
 |---|---|---|---|---|
 | `0` | tuner | tuner on/off | tune | |
-| `1` | processor: not available yet | | | |
-| `2` | VOX: not available yet | | | |
+| `1` | processor | on/off | processor level (focus) | processor level entry |
+| `2` | VOX | on/off | VOX gain (focus) | VOX gain entry |
 | `3` | monitor | on/off | monitor level (focus) | monitor level entry |
 | `4` `5` `6` | not available (TX low cut, equalizer, high cut) | | | |
-| `7` | mic gain: not available yet | | | |
+| `7` | mic gain (focus) | mic gain entry | | |
 | `8` | RF power setting (focus) | RF power entry | | |
-| `9` | VOX delay: not available yet | | | |
+| `9` | VOX delay (focus) | VOX delay entry (ms) | | |
+
+Levels 0-100 percent, `B`/`C` steps of 5. VOX delay 0-2000 ms in steps of
+100.
 
 ## Bank 5 - RIT
 
@@ -136,17 +139,23 @@ Home focus: the RIT offset.
 | `0` | repeater shift off | shift minus | shift plus |
 | `1` | repeater frequency: not available | | |
 | `2` | tone type: off or CTCSS | CTCSS | tone off |
-| `3` | CTCSS tone: not available yet | | |
+| `3` | CTCSS tone (focus) | CTCSS tone entry: `885` or `88*5` = 88.5 Hz | |
 | `4` | DCS: not available | | |
 | `5` | encode only (TX) or encode and decode (both) | step between both and TX | |
+
+`B`/`C` walk the 50 standard CTCSS tones (long: 5 tones) and set each at once.
 
 ## Bank 7 - CW
 
 | Key | Short | Long | Double |
 |---|---|---|---|
 | `0` | tuner | tuner on/off | tune |
+| `2` | break-in (focus) | next: off, semi, full | |
+| `5` | CW pitch (focus) | CW pitch entry (Hz) | |
 | `8` | RF power setting (focus) | RF power entry | |
-| `1`-`7`, `9` | keyer, break-in, sidetone, paddle, CW pitch, weight, paddle reverse, break-in delay: not available yet | | |
+| `1` `3` `4` `6` `7` `9` | keyer, sidetone, paddle, weight, paddle reverse, break-in delay: not available on Icom (as in HamTRC) | | |
+
+CW pitch 300-900 Hz, `B`/`C` steps of 10 Hz.
 
 ## Bank 8 - Connection
 

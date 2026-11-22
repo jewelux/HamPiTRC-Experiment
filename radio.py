@@ -95,6 +95,16 @@ FEATURE_OF = {
     'get_gps_select': 'gps', 'set_gps_select': 'gps',
     'get_gps_position_status': 'gps',
     'get_gps_tx_mode': 'gps', 'set_gps_tx_mode': 'gps',
+    'get_proc': 'proc', 'set_proc': 'proc',
+    'get_proc_level_percent': 'proc', 'set_proc_level_percent': 'proc',
+    'get_vox': 'vox', 'set_vox': 'vox',
+    'get_vox_gain_percent': 'vox', 'set_vox_gain_percent': 'vox',
+    'get_mic_gain_percent': 'mic_gain', 'set_mic_gain_percent': 'mic_gain',
+    'get_vox_delay_ms': 'vox_delay', 'set_vox_delay_ms': 'vox_delay',
+    'get_break_in': 'break_in', 'set_break_in': 'break_in',
+    'get_cw_pitch_hz': 'cw_pitch', 'set_cw_pitch_hz': 'cw_pitch',
+    'get_ctcss_tenths': 'ctcss', 'set_ctcss_tenths': 'ctcss',
+    'get_band_stack': 'band_stack', 'recall_band_stack': 'band_stack',
     'get_alc_meter_percent': 'alc_meter', 'get_comp_meter_percent': 'comp_meter',
     'get_voltage': 'vd_meter', 'get_current': 'id_meter',
 }
@@ -191,7 +201,7 @@ def select(key, serial_ports=None, remember=True):
     _profile = radio_profiles.get_profile(key)
     prefs = load_prefs()
     addr, baud, _port = _link_for(_profile, prefs)
-    civ.configure(addr, baud, _profile.transceive_menu_item)
+    civ.configure(addr, baud, _profile.transceive_menu_item, _profile.vox_delay_menu_item)
     if remember:
         prefs['profile'] = key
         save_prefs(prefs)
@@ -229,7 +239,8 @@ def reset_link():
     prefs = load_prefs()
     prefs.get('radios', {}).pop(_profile.key, None)
     save_prefs(prefs)
-    civ.configure(_profile.civ_addr, _profile.baud, _profile.transceive_menu_item)
+    civ.configure(_profile.civ_addr, _profile.baud, _profile.transceive_menu_item,
+                  _profile.vox_delay_menu_item)
     civ.set_baudrate(_profile.baud)
 
 

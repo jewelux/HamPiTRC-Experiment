@@ -43,8 +43,11 @@ Bank and key as in [keypad-map.md](keypad-map.md).
 | Tone type and direction (6 `2`, `5`) | on | on | on |
 | CI-V address, baud (8 `1`, `2`) | on | on | on |
 | Transceive (8 `3`) | on, menu 0131 | on, menu 0071 | off: menu item unknown |
-| Processor, VOX, mic gain, VOX delay (4) | next stage | next stage | next stage |
-| CW keys (7), CTCSS tone (6 `3`), band stack (3 `7`-`9`) | next stage | next stage | next stage |
+| Processor and level, VOX and gain, mic gain (4 `1`, `2`, `7`) | on | on | on |
+| VOX delay (4 `9`) | on, menu 0359 | on, menu 0191 | off: menu item in Hamlib only |
+| Break-in off/semi/full, CW pitch (7 `2`, `5`) | on | on | on |
+| CTCSS tone (6 `3`) | on | on | off: no tone command in Hamlib |
+| Band stack (3 `7`-`9`) | on | on | off: not in Hamlib |
 
 "–" means the radio does not have it. "off" means the radio may have it but
 the profile does not switch it on yet; experimental mode (Bank 9 `0` long)

@@ -317,8 +317,23 @@ def bank3(ui, key):
     if key == '6':
         return B(lambda: say_rxtx(ui), short_help='transceiver')
     if key in ('7', '8', '9'):
-        n = {'7': 'one', '8': 'two', '9': 'three'}[key]
-        return not_available(ui, 'band stack ' + n)
+        reg = {'7': 1, '8': 2, '9': 3}[key]
+        label = 'band stack ' + {1: 'one', 2: 'two', 3: 'three'}[reg]
+        if not radio.has('band_stack'):
+            return not_available(ui, label)
+
+        def say():
+            e = radio.get_band_stack(reg)
+            if e is None:
+                return ui.say(label + ' unavailable')
+            ui.value(label, frequency_words(e[0]) + ', ' + e[1])
+
+        def recall():
+            e = radio.recall_band_stack(reg)
+            if e is None:
+                return ui.say(label + ' unavailable')
+            ui.changed(label, frequency_words(e[0]) + ', ' + e[1])
+        return B(say, recall, short_help=label, hold_help=choose_(label))
     return None
 
 
@@ -328,9 +343,9 @@ def bank4(ui, key):
     if key == '0':
         return tuner_key(ui)
     if key == '1':
-        return not_available(ui, 'processor')
+        return switch_with_level(ui, 'processor', 'proc', 'get_proc', 'set_proc', 'proc_level')
     if key == '2':
-        return not_available(ui, 'vox')
+        return switch_with_level(ui, 'vox', 'vox', 'get_vox', 'set_vox', 'vox_gain')
     if key == '3':
         return switch_with_level(ui, 'monitor', 'monitor', 'get_monitor', 'set_monitor',
                                  'monitor_level')
@@ -341,11 +356,11 @@ def bank4(ui, key):
     if key == '6':
         return not_available(ui, 'tx high cut')
     if key == '7':
-        return not_available(ui, 'mic gain')
+        return setting_key(ui, 'mic_gain')
     if key == '8':
         return rf_power_key(ui)
     if key == '9':
-        return not_available(ui, 'vox delay')
+        return setting_key(ui, 'vox_delay')
     return None
 
 
@@ -432,7 +447,7 @@ def bank6(ui, key):
             ui.say('tone off')
         return B(say, ctcss, off, short_help='tone', hold_help='tone C T C S S', double_help='tone off')
     if key == '3':
-        return not_available(ui, 'C T C S S tone')
+        return setting_key(ui, 'ctcss')
     if key == '4':
         return not_available(ui, 'D C S')
     if key == '5':
@@ -461,10 +476,16 @@ def bank6(ui, key):
 # --- Bank 7: CW ---------------------------------------------------------------------------------
 
 def bank7(ui, key):
-    names = {'1': 'keyer', '2': 'break in', '3': 'sidetone', '4': 'paddle', '5': 'C W pitch',
+    # Icom: break-in off, semi, full and the CW pitch; the rest is FT-8x7 and
+    # Yaesu in HamTRC and says "not available".
+    names = {'1': 'keyer', '3': 'sidetone', '4': 'paddle',
              '6': 'C W weight', '7': 'paddle reverse', '9': 'break in delay'}
     if key == '0':
         return tuner_key(ui)
+    if key == '2':
+        return list_key(ui, 'break_in')
+    if key == '5':
+        return setting_key(ui, 'cw_pitch')
     if key == '8':
         return rf_power_key(ui)
     if key in names:

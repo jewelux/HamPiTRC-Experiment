@@ -55,12 +55,23 @@ class Capabilities:
     transceive: bool = False      # 1A 05 <transceive_menu_item>
     tuner: bool = False           # 1C 01
     xfc: bool = False             # 1C 02
+    # Bank 4: phone transmit
+    proc: bool = False            # 16 44 / 14 0E
+    vox: bool = False             # 16 46 / 14 16
+    mic_gain: bool = False        # 14 0B
+    vox_delay: bool = False       # 1A 05 <vox_delay_menu_item>
+    # Bank 7: CW
+    break_in: bool = False        # 16 47 off / semi / full
+    cw_pitch: bool = False        # 14 09
+    # Bank 3: band stack
+    band_stack: bool = False      # 1A 01
     # Bank 5: RIT
     rit: bool = False             # 21 00 / 21 01
     # Bank 6: repeater and tones
     duplex: bool = False          # 0F 10 / 11 / 12
     repeater_tone: bool = False   # 16 42
     tsql: bool = False            # 16 43
+    ctcss: bool = False           # 1B 00 / 1B 01
     dtcs: bool = False            # 16 4B
     tone_squelch_mode: bool = False  # 16 5D
     dsql_csql: bool = False       # 16 5B (D-STAR)
@@ -89,7 +100,9 @@ FEATURE_NAMES = {
     'monitor': 'Monitor', 'monitor_level': 'Monitor level',
     'transceive': 'Transceive', 'tuner': 'Tuner', 'xfc': 'XFC', 'rit': 'RIT',
     'duplex': 'Duplex', 'repeater_tone': 'Repeater tone', 'tsql': 'TSQL',
-    'dtcs': 'DTCS', 'tone_squelch_mode': 'Tone mode',
+    'dtcs': 'DTCS', 'ctcss': 'C T C S S tone', 'proc': 'Processor', 'vox': 'VOX',
+    'mic_gain': 'Mic gain', 'vox_delay': 'VOX delay', 'break_in': 'Break in',
+    'cw_pitch': 'C W pitch', 'band_stack': 'Band stack', 'tone_squelch_mode': 'Tone mode',
     'dsql_csql': 'Digital squelch', 'memory': 'Memory',
     'memory_clear': 'Memory clear', 'scan': 'Scan', 'dv_data': 'DV data',
     'gps': 'GPS', 'alc_meter': 'ALC meter', 'comp_meter': 'Compression meter',
@@ -118,6 +131,7 @@ class RadioProfile:
     modes: tuple              # mode names it can select, see MODE_CODES
     transceive_menu_item: int = 0  # 1A 05 menu number of "CI-V Transceive"
     rf_power_max_watts: int = 100  # RF power 14 0A: 255 is this many watts
+    vox_delay_menu_item: int = 0   # 1A 05 menu number of the VOX delay
     status: str = 'not tested'     # hardware status, as in the support matrix
     notes: str = ''
 
@@ -134,8 +148,10 @@ IC705_CAPS = Capabilities(
     vfo=True, split=True, vfo_b_direct=True,
     monitor=True, monitor_level=True, transceive=True, tuner=True, xfc=True,
     rit=True,
-    duplex=True, repeater_tone=True, tsql=True, dtcs=True,
+    duplex=True, repeater_tone=True, tsql=True, dtcs=True, ctcss=True,
     tone_squelch_mode=True, dsql_csql=True,
+    proc=True, vox=True, mic_gain=True, vox_delay=True,
+    break_in=True, cw_pitch=True, band_stack=True,
     memory=True, memory_clear=True, scan=True, dv_data=True, gps=True,
     alc_meter=True, comp_meter=True, vd_meter=True, id_meter=True,
 )
@@ -143,7 +159,8 @@ IC705_CAPS = Capabilities(
 # --- IC-7300 -----------------------------------------------------------------
 # HF/50 MHz, no D-STAR, no GPS, no repeater shift over CI-V (Hamlib has no
 # rptr_shift for it), no DTCS. 25/26 and 1C 03 are always present (Hamlib
-# x25x26_always, x1cx03_always). Transceive is menu 0071 (HamTRC, Hamlib).
+# x25x26_always, x1cx03_always). Transceive is menu 0071, VOX delay 0191
+# (HamTRC, Hamlib).
 # XFC (1C 02) left off until checked against the CI-V guide.
 IC7300_CAPS = replace(
     IC705_CAPS,
@@ -155,7 +172,9 @@ IC7300_CAPS = replace(
 # HF/VHF/UHF with D-STAR. Address 88h, max 19200 baud (Hamlib ic7100.c).
 # Hamlib lists no monitor switch, no RIT command, no transceive menu item, no
 # filter shape and no notch width for it, and only "possibly" 25/26 and
-# 1C 03, so those stay off until tested on a radio. Repeater shift (0F 1x),
+# 1C 03, so those stay off until tested on a radio. Processor, VOX and its
+# gain, mic gain, break-in and CW pitch are in Hamlib; the VOX delay menu item
+# (0165) only there, no CTCSS tone command and no band stack: off. Repeater shift (0F 1x),
 # tone and TSQL are in Hamlib. D-STAR squelch, DV data and GPS stay off
 # until checked against the IC-7100 CI-V guide.
 IC7100_CAPS = Capabilities(
@@ -166,6 +185,7 @@ IC7100_CAPS = Capabilities(
     vfo=True, split=True,
     monitor_level=True, tuner=True,
     duplex=True, repeater_tone=True, tsql=True,
+    proc=True, vox=True, mic_gain=True, break_in=True, cw_pitch=True,
     memory=True, memory_clear=True, scan=True,
     alc_meter=True, comp_meter=True, vd_meter=True, id_meter=True,
 )
@@ -178,6 +198,7 @@ PROFILES = (
         civ_addr=0xA4, baud=115200, bauds=CIV_BAUDS,
         serial_port='/dev/ttyACM0', caps=IC705_CAPS,
         modes=HF_MODES + ('DV',), transceive_menu_item=0x0131, rf_power_max_watts=10,
+        vox_delay_menu_item=0x0359,
         status='tested on hardware',
         notes='Raspberry Pi 5, USB numeric keypad, PC speakers.',
     ),
@@ -185,7 +206,7 @@ PROFILES = (
         key='ic7300', name='Icom IC-7300', spoken='I C seventy-three hundred',
         civ_addr=0x94, baud=115200, bauds=CIV_BAUDS,
         serial_port='/dev/ttyUSB0', caps=IC7300_CAPS,
-        modes=HF_MODES, transceive_menu_item=0x0071,
+        modes=HF_MODES, transceive_menu_item=0x0071, vox_delay_menu_item=0x0191,
         notes='Command set from the IC-705 profile minus D-STAR, GPS and repeater.',
     ),
     RadioProfile(
@@ -232,6 +253,8 @@ def validate():
                 problems.append(p.key + ': unknown mode ' + m)
         if p.caps.transceive and not p.transceive_menu_item:
             problems.append(p.key + ': transceive without menu item')
+        if p.caps.vox_delay and not p.vox_delay_menu_item:
+            problems.append(p.key + ': vox delay without menu item')
         if p.caps.memory_clear and not p.caps.memory:
             problems.append(p.key + ': memory_clear without memory')
     for name in capability_names():

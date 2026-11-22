@@ -2,6 +2,17 @@
 
 ## Unreleased (development, 0.8.0-dev)
 
+### Transmit, CW, tone and band stack (Icom)
+
+- Bank 4: processor and level, VOX and gain, mic gain, VOX delay (IC-705
+  menu 0359, IC-7300 0191), as HamTRC
+- Bank 7: break-in off/semi/full, CW pitch 300-900 Hz
+- Bank 6 `3`: CTCSS tone, set as repeater and TSQL tone, `B`/`C` walk the
+  50 standard tones
+- Bank 3 `7`-`9`: band stack registers 1-3 of the current band, long recalls
+- IC-7100: processor, VOX, mic gain, break-in and CW pitch on; VOX delay,
+  CTCSS tone and band stack off until checked
+
 ### Keypad as in HamTRC
 
 - **layout and behaviour of HamTRC's development branch** (Icom column of its
@@ -23,8 +34,6 @@
 - memory, scan, D-STAR data, GPS, DTCS, tone mode and digital squelch are off
   the keypad, as HamTRC has none; their commands stay in `civ.py`. The memory
   confirmation of the earlier development state went with them
-- not yet on a key, saying "not available": processor, VOX, mic gain, VOX
-  delay, CW keys, CTCSS tone, band stack (next stage)
 - new modules `keypad_input.py`, `banks.py`, `ui.py`, `settings.py`; `speech.py`
   plays through a queue that a key press can stop
 

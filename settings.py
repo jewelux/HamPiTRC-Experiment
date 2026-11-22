@@ -240,6 +240,27 @@ def _profile_read():
 SPEEDS = ('slow', 'normal', 'fast')
 
 
+def _ctcss_step(tenths, d):
+    import civ
+    tones = civ.CTCSS_TONES
+    if d > 0:
+        later = [t for t in tones if t > tenths]
+        return later[0] if later else tones[-1] + 1
+    earlier = [t for t in tones if t < tenths]
+    return earlier[-1] if earlier else tones[0] - 1
+
+
+def _ctcss_write(tenths):
+    import civ
+    tone = min(civ.CTCSS_TONES, key=lambda t: abs(t - tenths))   # nearest standard tone
+    radio.set_ctcss_tenths(tone)
+    return radio.get_ctcss_tenths()
+
+
+def _ctcss_text(tenths):
+    return number_words(tenths, 1) + ' hertz'
+
+
 def build(ui):
     """The settings, given the ui (for volume, speed and profile switching)."""
     nr_r, nr_w = _pair('get_nr_level_percent', 'set_nr_level_percent')
@@ -253,6 +274,12 @@ def build(ui):
     att_r, att_w = _list_index('get_att', 'set_att', (0, 20))
     agc_r, agc_w = _list_index('get_agc', 'set_agc', AGC_CODES)
     level = dict(min=0, max=100, step=5, unit=' percent')
+    proc_r, proc_w = _pair('get_proc_level_percent', 'set_proc_level_percent')
+    voxg_r, voxg_w = _pair('get_vox_gain_percent', 'set_vox_gain_percent')
+    mic_r, mic_w = _pair('get_mic_gain_percent', 'set_mic_gain_percent')
+    voxd_r, voxd_w = _pair('get_vox_delay_ms', 'set_vox_delay_ms')
+    pitch_r, pitch_w = _pair('get_cw_pitch_hz', 'set_cw_pitch_hz')
+    bk_r, bk_w = _list_index('get_break_in', 'set_break_in', (0, 1, 2))
     items = [
         Setting('rf_power', 'power', cap='rf_power', read=_rf_read, write=_rf_write,
                 min=0, max=_rf_max_tenths, step_fn=_rf_step, scale=10, text=_rf_text,
@@ -277,6 +304,18 @@ def build(ui):
                 choices=_att_choices, big_steps=1),
         Setting('monitor_level', 'monitor level', cap='monitor_level', read=mon_r, write=mon_w,
                 **level),
+        Setting('proc_level', 'processor level', cap='proc', read=proc_r, write=proc_w, **level),
+        Setting('vox_gain', 'vox gain', cap='vox', read=voxg_r, write=voxg_w, **level),
+        Setting('mic_gain', 'mic gain', cap='mic_gain', read=mic_r, write=mic_w, **level),
+        Setting('vox_delay', 'vox delay', cap='vox_delay', read=voxd_r, write=voxd_w,
+                min=0, max=2000, step=100, unit=' milliseconds'),
+        Setting('cw_pitch', 'C W pitch', cap='cw_pitch', read=pitch_r, write=pitch_w,
+                min=300, max=900, step=10, unit=' hertz'),
+        Setting('break_in', 'break in', 'list', cap='break_in', read=bk_r, write=bk_w,
+                choices=lambda: [('0', 'off'), ('1', 'semi'), ('2', 'full')], big_steps=1),
+        Setting('ctcss', 'C T C S S tone', cap='ctcss', read=lambda: radio.get_ctcss_tenths(),
+                write=_ctcss_write, min=670, max=2541, step_fn=_ctcss_step, point_digits=1,
+                text=_ctcss_text),
         Setting('rit_offset', 'R I T', cap='rit', read=rit_r, write=rit_w,
                 min=-9999, max=9999, step=10, big_steps=10, sign=True, centre=0, text=_rit_text),
         Setting('baud', 'baud', 'list', read=_baud_read, write=_baud_write,
