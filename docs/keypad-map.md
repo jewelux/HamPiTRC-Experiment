@@ -1,4 +1,4 @@
-# PiHAMTRC keypad reference
+# HamPiTRC keypad map
 
 Start:
 
@@ -8,25 +8,31 @@ python -B pihamtrc.py
 
 Exit: `NumLock` + `Tab`.
 
-Basic operation:
+## Basic operation
 
 - Short press: function from the active bank.
-- Long press: alternative function, starting at approximately 0.5 seconds.
-- Double-click: reverse/decrease function, where implemented.
- Announce - `*` short: active bank.
- Enter - `*` long: bank number and confirm with `D`.
-- `#`: cancel entry.
-- `D`: confirm entry.
+- Long press: alternative function, from about 0.5 seconds.
+- Double-click: reverse or decrease, where implemented.
+- `*` short: announce the active bank.
+- `*` long: enter a bank number and confirm with `D`.
+- `#`: cancel an entry.
+- `D`: confirm an entry.
 
-Numeric entry:
+A key whose function the active radio does not have says, for example,
+"GPS not available on I C seventy-three hundred" and sends nothing to the
+radio. Which radio has what: [radio-support-matrix.md](radio-support-matrix.md).
 
- Enter - Frequency: in kHz and confirm with `D`. Example: `14250` = 14.250 MHz.
- Enter - Mode: one digit and confirm with `D`.
-- RF Power and Monitor Level: percentage `0` to `100`, confirmed with `D`.
-- CI-V address: decimal value `0` to `255`, confirmed with `D`.
-- Memory Channel: channel `0` to `99`, confirmed with `D`.
+## Numeric entry
 
-Mode digits:
+- Frequency: in kHz, confirm with `D`. Example: `14250` = 14.250 MHz.
+- Mode: one digit, confirm with `D`.
+- RF power and monitor level: percent `0` to `100`, confirm with `D`.
+- CI-V address: decimal `0` to `255`, confirm with `D`.
+- Memory channel: `0` to `99`, confirm with `D`.
+- Memory write and memory clear: `D` confirms, `#` cancels. No other key
+  does anything until one of the two is pressed.
+
+## Mode digits
 
 | Key | Mode |
 | --- | --- |
@@ -37,12 +43,12 @@ Mode digits:
 | `5` | AM |
 | `6` | RTTY |
 | `7` | CW-R |
-| `8` | DV |
+| `8` | DV (IC-705, IC-7100) |
 | `9` | RTTY-R |
 
- Select ## Bankion
+## Bank selection
 
- Enter Hold `*`, the bank number, then press `D`.
+Hold `*`, type the bank number, then press `D`.
 
 | Bank | Name |
 | --- | --- |
@@ -52,7 +58,7 @@ Mode digits:
 | `4` | Monitor |
 | `5` | RIT |
 | `6` | Repeater |
-| `7` | Memory, Scan, D-Star, GPS |
+| `7` | Memory, Scan, D-STAR, GPS |
 | `8` | CI-V Setup |
 | `9` | System |
 
@@ -174,9 +180,9 @@ Mode digits:
 
 | Key | Short | Long | Double-click |
 | --- | --- | --- | --- |
-| `0` | Select Memory Mode | Memory Write | No function |
+| `0` | Select Memory Mode | Memory Write, after `D` to confirm | No function |
 | `1` | Enter Memory Channel | No function | No function |
-| `2` | Memory copy to VFO | Memory Clear | No function |
+| `2` | Memory copy to VFO | Memory Clear, after `D` to confirm | No function |
 | `3` | Scan Stop | No function | No function |
 | `4` | Program Memory Scan | Program Scan | No function |
 | `5` | Memory Scan | Select Memory Scan | No function |
@@ -206,17 +212,20 @@ Mode digits:
 | `A` | No function | No function | No function |
 | `B` | No function | No function | No function |
 | `C` | No function | No function | No function |
-| `D` | No function | No function | No function |
+| `D` | No function | Save CI-V address and baud rate for this radio | No function |
 
 Baud-rate order: `4800`, `9600`, `19200`, `38400`, `115200`.
+
+Changes made with keys `1` and `2` apply at once. Long `D` keeps them for the
+next start (in `~/.config/hampitrc/prefs.json`, per radio).
 
 ## Bank 9: System
 
 | Key | Short | Long | Double-click |
 | --- | --- | --- | --- |
 | `0` | No function | No function | No function |
-| `1` | Profile next unavailable | No function | No function |
-| `2` | Profile previous unavailable | No function | No function |
+| `1` | Next radio, connect to it | No function | No function |
+| `2` | Previous radio, connect to it | No function | No function |
 | `3` | No function | No function | No function |
 | `4` | Announce Tuning Speech status | Tuning Speech on/off | No function |
 | `5` | Announce Volume | No function | No function |
@@ -224,9 +233,13 @@ Baud-rate order: `4800`, `9600`, `19200`, `38400`, `115200`.
 | `7` | Set volume 1 | Volume -1 | No function |
 | `8` | Set volume 2 | Volume +1 | No function |
 | `9` | Set volume 3 | No function | No function |
-| `A` | Announce IC-705 profile | No function | No function |
+| `A` | Announce the active radio | No function | No function |
 | `B` | No function | No function | No function |
 | `C` | No function | No function | No function |
 | `D` | No function | No function | No function |
+
+Radio order: IC-705, IC-7300, IC-7100. The chosen radio is remembered for the
+next start. If its serial port is not there, HamPiTRC says "selected, not
+connected"; press `1` or `2` again to go on.
 
 Note: Volume functions currently manage the internal PiHAMTRC value. They do not change ALSA playback volume.

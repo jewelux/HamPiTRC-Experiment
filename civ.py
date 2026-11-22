@@ -1,25 +1,52 @@
-# PiHAMTRC IC-705 - direct CI-V
+# HamPiTRC - Icom CI-V protocol (was ic705.py)
+#
+# One module for every Icom radio. The active profile (radio_profiles.py)
+# sets the CI-V address, baud rate and the transceive menu item through
+# configure(); radio.py checks the profile's capabilities before a call
+# reaches this module.
 import serial, time
+
+from radio_profiles import MODE_CODES
 
 CIV_ADDR = 0xA4
 CIV_CTRL = 0xE0
 BAUDRATE = 115200
+TRANSCEIVE_MENU_ITEM = 0x0131
 QUERY_RETRIES = 3
 QUERY_TIMEOUT = 0.8
 
-MODE_NAMES = {
-    0x00: "LSB", 0x01: "USB", 0x02: "AM",
-    0x03: "CW",  0x04: "RTTY", 0x05: "FM",
-    0x07: "CW-R", 0x08: "RTTY-R", 0x11: "DV",
-}
-MODE_CODES = {v: k for k, v in MODE_NAMES.items()}
+MODE_NAMES = {v: k for k, v in MODE_CODES.items()}
+
+# Icom S-meter scale (15 02): 0 = S0, 120 = S9, 241 = S9 + 60 dB
+# (IC-7300 / IC-705 CI-V reference, Hamlib; same as HamTRC civ_smeter.cpp).
+SMETER_RAW_S9 = 120
+SMETER_RAW_S9_PLUS_60 = 241
 
 _ser = None
+
+def configure(civ_addr, baudrate, transceive_menu_item=0):
+    """Take the address, baud rate and menu item of the active profile."""
+    global CIV_ADDR, BAUDRATE, TRANSCEIVE_MENU_ITEM
+    CIV_ADDR = max(0, min(255, int(civ_addr)))
+    BAUDRATE = int(baudrate)
+    TRANSCEIVE_MENU_ITEM = int(transceive_menu_item)
 
 def connect(port):
     global _ser
     _ser = serial.Serial(port, BAUDRATE, timeout=0.5)
     time.sleep(0.1)
+
+def disconnect():
+    global _ser
+    if _ser is not None:
+        try:
+            _ser.close()
+        except (serial.SerialException, AttributeError):
+            pass
+    _ser = None
+
+def is_connected():
+    return _ser is not None
 
 def set_civ_address(addr):
     global CIV_ADDR
@@ -221,14 +248,22 @@ def set_mode(mode_name, filt=1):
     _ser.reset_input_buffer()
     return True
 
+def smeter_text(raw):
+    """Spoken S-meter value for a raw 15 02 reading on Icom's scale."""
+    raw = max(0, int(raw))
+    if raw < SMETER_RAW_S9:
+        units = (raw * 9 + SMETER_RAW_S9 // 2) // SMETER_RAW_S9
+        return f"S {units}"
+    raw = min(raw, SMETER_RAW_S9_PLUS_60)
+    span = SMETER_RAW_S9_PLUS_60 - SMETER_RAW_S9
+    over = ((raw - SMETER_RAW_S9) * 6 + span // 2) // span * 10
+    return "S 9" if over == 0 else f"S 9 plus {over}"
+
 def get_smeter():
-    resp = _query(0x15, [0x02])
-    if resp and len(resp) >= 3 and resp[0] == 0x02:
-        raw = ((resp[1] & 0x0F) * 10) + ((resp[2] >> 4) & 0x0F)
-        if raw <= 9: return f"S {raw}"
-        over = (raw - 9) * 10
-        return f"S 9 plus {over}"
-    return "unavailable"
+    raw = _get_meter_raw(0x02)
+    if raw is None:
+        return "S meter unavailable"
+    return smeter_text(raw)
 
 def _get_meter_raw(meter_id):
     resp = _query(0x15, [meter_id])
@@ -576,13 +611,13 @@ def set_monitor_level_percent(percent):
     _set_14_value(0x15, _percent_to_raw(percent))
 
 def get_transceive():
-    raw = _query_menu_byte(0x05, 0x0131)
+    raw = _query_menu_byte(0x05, TRANSCEIVE_MENU_ITEM)
     if raw is None:
         return None
     return raw != 0x00
 
 def set_transceive(on):
-    _set_menu_byte(0x05, 0x0131, 0x01 if on else 0x00)
+    _set_menu_byte(0x05, TRANSCEIVE_MENU_ITEM, 0x01 if on else 0x00)
 
 def get_notch():
     value = _query_16_byte(0x48)

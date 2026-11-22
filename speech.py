@@ -28,17 +28,25 @@ def _get_audio_device():
                 return f"plughw:{card_num},0"
     return AUDIO_DEVICE
 
-print("Loading voice model...")
-_voice = PiperVoice.load(PIPER_MODEL)
-print("Voice model ready.")
+_voice = None
 _last_audio_busy_print = 0
+
+def load_voice():
+    """Load the Piper model once; say() calls this on first use."""
+    global _voice
+    if _voice is None:
+        print("Loading voice model...")
+        _voice = PiperVoice.load(PIPER_MODEL)
+        print("Voice model ready.")
+    return _voice
 
 def say(text):
     global _last_audio_busy_print
     print(f"Say: {text}")
+    voice = load_voice()
     buf = io.BytesIO()
     with wave.open(buf, 'wb') as wav_file:
-        for chunk in _voice.synthesize(text):
+        for chunk in voice.synthesize(text):
             if wav_file.getnframes() == 0:
                 wav_file.setnchannels(chunk.sample_channels)
                 wav_file.setsampwidth(chunk.sample_width)
@@ -74,6 +82,7 @@ def spell(text):
 
 # Spoken abbreviations
 SPEAK_MAP = {
+    'HamPiTRC': 'Ham Pi T R C',
     'PiHAMTRC': 'Pi Ham T R C',
     'HAMTRC':   'Ham T R C',
     'VFO':      'V F O',
@@ -89,9 +98,19 @@ SPEAK_MAP = {
     'RF':       'R F',
     'AF':       'A F',
     'DV':       'D V',
+    'WFM':      'wide F M',
+    'DTCS':     'D T C S',
+    'TSQL':     'T S Q L',
+    'DSQL':     'D S Q L',
+    'CSQL':     'C S Q L',
+    'XFC':      'X F C',
 }
 
+def nice_text(text):
+    # Longest first, so RTTY-R is not read as RTTY plus "-R".
+    for abbr in sorted(SPEAK_MAP, key=len, reverse=True):
+        text = text.replace(abbr, SPEAK_MAP[abbr])
+    return text
+
 def say_nice(text):
-    for abbr, spoken in SPEAK_MAP.items():
-        text = text.replace(abbr, spoken)
-    say(text)
+    say(nice_text(text))

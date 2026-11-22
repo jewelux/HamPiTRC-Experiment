@@ -1,0 +1,45 @@
+HamPiTRC - test list for Icom radios
+=====================================
+
+For a test on a real radio, read aloud or with a screen reader. Mark each
+line OK, WRONG (what was said / what the radio did) or N/A.
+
+Radio: ____________   Date: ____________   Tester: ____________
+HamPiTRC version (Bank 1, D): ____________
+
+Start
+[ ] "PiHAMTRC ready", radio name, mode and frequency are spoken
+[ ] Bank 9, A: says the radio's name
+
+Bank 1
+[ ] 0 short: frequency matches the radio
+[ ] 0 long, 14250, D: radio goes to 14.250 MHz
+[ ] 9 short: mode matches
+[ ] 9 long, 2, D: radio goes to USB
+[ ] 7 short: S-meter roughly matches the radio's meter (S9 = "S 9")
+[ ] 1 short: "Receiving"
+[ ] 6 short: RF power percent matches
+[ ] 3 long: lock toggles on the radio
+
+Bank 2
+[ ] 1 long: NR toggles     [ ] 2 long: NB toggles     [ ] 3 long: notch toggles
+[ ] A long: preamp steps   [ ] B long: attenuator     [ ] C long: AGC steps
+
+Bank 3
+[ ] A / B / C: VFO A, VFO B, swap on the radio
+[ ] 0 long: split toggles
+
+Bank 4 / 5 / 6 (as the radio has them)
+[ ] tuner status          [ ] monitor level
+[ ] RIT status and +10 Hz [ ] duplex, repeater tone
+
+Bank 7 - careful, use a spare memory channel
+[ ] 2 long: asks "Memory clear. D to confirm, sharp to cancel"
+[ ] # cancels, nothing changed on the radio
+[ ] 3 short: scan stop
+
+Not available
+[ ] a feature the radio lacks says "... not available on ..." and the radio
+    does not react
+
+Notes:

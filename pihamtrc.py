@@ -1,9 +1,11 @@
-# PiHAMTRC main program v0.7.0
-# Key mapping based on the ESP32-HAMTRC IC-7300/IC-705 profile
+# HamPiTRC main program (spoken name PiHAMTRC)
+# Key mapping based on the HamTRC IC-7300/IC-705 profile.
+# All radio calls go through radio.py, which checks the active profile.
 import evdev, select, sys, time, subprocess
-from config import KEYBOARD_NAME, DEVICE_RADIO, AUDIO_NAME, AUDIO_DEVICE, HDMI_NAME, VERSION, CALLSIGN
-from speech import say, say_nice as say
-import ic705
+import config
+from config import KEYBOARD_NAME, AUDIO_NAME, AUDIO_DEVICE, HDMI_NAME, VERSION, CALLSIGN
+from speech import say_nice as say
+import radio
 from keymap import KEY_MAP, BANK_NAMES
 
 bank = 1
@@ -67,17 +69,42 @@ def find_audio_device():
     return AUDIO_DEVICE
 
 # --- Discover keyboard ---
-def find_keyboard():
-    candidates = []
-    for path in evdev.list_devices():
-        d = evdev.InputDevice(path)
-        if KEYBOARD_NAME in d.name and d.name.strip().endswith('Keyboard'):
-            candidates.append(d)
-    if candidates:
-        dev = min(candidates, key=lambda d: d.path)
-        print('Keyboard found: ' + dev.path + ' ' + dev.name)
-        return dev
+def _has_keypad_keys(device):
+    try:
+        keys = device.capabilities().get(evdev.ecodes.EV_KEY, [])
+    except (OSError, AttributeError):
+        return False
+    return evdev.ecodes.KEY_KP0 in keys and evdev.ecodes.KEY_KP9 in keys
+
+def pick_keyboard(devices, name=KEYBOARD_NAME):
+    """The keypad among devices: name match first, then numeric keypad keys.
+
+    A keypad usually shows up as several input devices (keyboard, consumer
+    control, system control); only the keyboard one has the keypad keys.
+    """
+    named = [d for d in devices if name and name in d.name]
+    for group in (named, devices if not name else []):
+        with_keys = [d for d in group if _has_keypad_keys(d)]
+        if with_keys:
+            return min(with_keys, key=lambda d: d.path)
+    # Old rule (0.7.0): name match and a name ending in "Keyboard".
+    legacy = [d for d in named if d.name.strip().endswith('Keyboard')]
+    if legacy:
+        return min(legacy, key=lambda d: d.path)
     return None
+
+def find_keyboard():
+    devices = [evdev.InputDevice(path) for path in evdev.list_devices()]
+    dev = pick_keyboard(devices)
+    if dev is None:
+        return None
+    print('Keyboard found: ' + dev.path + ' ' + dev.name)
+    if getattr(config, 'KEYBOARD_GRAB', True):
+        try:
+            dev.grab()
+        except OSError as e:
+            print('Keyboard grab failed: ' + str(e))
+    return dev
 
 # --- Numeric entry ---
 def start_input(mode):
@@ -106,6 +133,10 @@ def start_input(mode):
         say('Enter CI V address decimal, D to confirm')
     elif mode == 'memory_channel':
         say('Enter memory channel, D to confirm')
+    elif mode == 'confirm_memory_write':
+        say('Memory write. D to confirm, sharp to cancel')
+    elif mode == 'confirm_memory_clear':
+        say('Memory clear. D to confirm, sharp to cancel')
 
 def cancel_input():
     global input_mode, input_digits
@@ -115,6 +146,13 @@ def cancel_input():
 
 def confirm_input():
     global input_mode, input_digits
+    if input_mode in CONFIRM_ACTIONS:
+        action, label = CONFIRM_ACTIONS[input_mode]
+        input_mode = None
+        input_digits = ''
+        getattr(radio, action)()
+        say(label)
+        return
     if not input_digits:
         say('No entry')
         return
@@ -126,13 +164,13 @@ def confirm_input():
             say('Frequency out of range')
         else:
             if input_mode == 'vfoa_freq':
-                ic705.set_vfoa_freq(hz)
+                radio.set_vfoa_freq(hz)
                 label = 'VFO Alpha frequency'
             elif input_mode == 'vfob_freq':
-                ic705.set_vfob_freq(hz)
+                radio.set_vfob_freq(hz)
                 label = 'VFO Bravo frequency'
             else:
-                ic705.set_freq(hz)
+                radio.set_freq(hz)
                 label = 'Frequency'
             say(label + ' set to ' + '{:.3f}'.format(hz / 1_000_000) + ' megahertz')
     elif input_mode == 'rf_power':
@@ -140,14 +178,14 @@ def confirm_input():
         if percent < 0 or percent > 100:
             say('RF power out of range')
         else:
-            ic705.set_rf_power_percent(percent)
+            radio.set_rf_power_percent(percent)
             say('RF power ' + str(percent) + ' percent')
     elif input_mode == 'monitor_level':
         percent = int(input_digits)
         if percent < 0 or percent > 100:
             say('Monitor level out of range')
         else:
-            ic705.set_monitor_level_percent(percent)
+            radio.set_monitor_level_percent(percent)
             say('Monitor level ' + str(percent) + ' percent')
     elif input_mode in ('mode', 'vfoa_mode', 'vfob_mode'):
         mode = MODE_DIGITS.get(input_digits)
@@ -155,13 +193,13 @@ def confirm_input():
             say('Mode unavailable')
         else:
             if input_mode == 'vfoa_mode':
-                ok = ic705.set_vfoa_mode(mode)
+                ok = radio.set_vfoa_mode(mode)
                 label = 'VFO Alpha mode '
             elif input_mode == 'vfob_mode':
-                ok = ic705.set_vfob_mode(mode)
+                ok = radio.set_vfob_mode(mode)
                 label = 'VFO Bravo mode '
             else:
-                ok = ic705.set_mode(mode)
+                ok = radio.set_mode(mode)
                 label = 'Mode '
             say(label + mode if ok else 'Mode unavailable')
     elif input_mode == 'bank':
@@ -175,21 +213,30 @@ def confirm_input():
         if addr < 0 or addr > 255:
             say('CI V address out of range')
         else:
-            ic705.set_civ_address(addr)
+            radio.set_civ_address(addr)
             say('CI V address ' + str(addr))
     elif input_mode == 'memory_channel':
         channel = int(input_digits)
         if channel < 0 or channel > 99:
             say('Memory channel out of range')
         else:
-            ic705.select_memory_channel(channel)
+            radio.select_memory_channel(channel)
             say('Memory channel ' + str(channel))
 
     input_mode = None
     input_digits = ''
 
+# Entries that only need D (confirm) or # (cancel): radio call, spoken result.
+CONFIRM_ACTIONS = {
+    'confirm_memory_write': ('memory_write', 'Memory written'),
+    'confirm_memory_clear': ('memory_clear', 'Memory cleared'),
+}
+
 def handle_input_key(key):
     global input_digits
+    if input_mode in CONFIRM_ACTIONS and key not in ('#', 'D'):
+        say('D to confirm, sharp to cancel')
+        return True
     if key in '0123456789':
         max_len = 1 if input_mode in ('mode', 'vfoa_mode', 'vfob_mode', 'bank') else 9
         if input_mode in ('civ_address', 'memory_channel'):
@@ -232,12 +279,12 @@ def adjust_centered(getter, setter, label, delta):
     say(label + ' ' + str(value))
 
 def adjust_rit(delta):
-    value = ic705.get_rit_offset_hz()
+    value = radio.get_rit_offset_hz()
     if value is None:
         say('RIT unavailable')
         return
     value = max(-9999, min(9999, value + delta))
-    ic705.set_rit_offset_hz(value)
+    radio.set_rit_offset_hz(value)
     say('RIT ' + str(value) + ' hertz')
 
 def say_preamp(value):
@@ -300,64 +347,64 @@ def say_dsql_csql(value):
 # --- BANK 1 short press ---
 def handle_short_bank1(key):
     if key == '0':
-        freq = ic705.get_freq_mhz()
+        freq = radio.get_freq_mhz()
         if freq:
             say('Frequency ' + '{:.3f}'.format(freq) + ' megahertz')
         else:
             say('Frequency unavailable')
     elif key == '1':
-        tx = ic705.get_tx()
+        tx = radio.get_tx()
         say('Transmitting' if tx else 'Receiving')
     elif key == '2':
-        freq = ic705.get_tx_freq_mhz()
+        freq = radio.get_tx_freq_mhz()
         if freq:
             say('TX frequency ' + '{:.3f}'.format(freq) + ' megahertz')
         else:
             say('TX frequency unavailable')
     elif key == '3':
-        lock = ic705.get_lock()
+        lock = radio.get_lock()
         if lock is None:
             say('Lock unavailable')
         else:
             say('Lock on' if lock else 'Lock off')
     elif key == '4':
-        power = ic705.get_power_meter_percent()
+        power = radio.get_power_meter_percent()
         if power is not None:
             say('Power ' + str(power) + ' percent')
         else:
-            power = ic705.get_rf_power_percent()
+            power = radio.get_rf_power_percent()
             if power is not None:
                 say('RF power ' + str(power) + ' percent')
             else:
                 say('Power unavailable')
     elif key == '6':
-        power = ic705.get_rf_power_percent()
+        power = radio.get_rf_power_percent()
         if power is not None:
             say('RF power ' + str(power) + ' percent')
         else:
             say('RF power unavailable')
     elif key == '7':
-        say(ic705.get_smeter())
+        say(radio.get_smeter())
     elif key == '8':
-        swr = ic705.get_swr()
+        swr = radio.get_swr()
         if swr is None:
             say('SWR unavailable')
         else:
             say('SWR ' + str(swr))
     elif key == '9':
-        mode = ic705.get_mode()
+        mode = radio.get_mode()
         if mode:
             say('Mode ' + mode)
         else:
             say('Mode unavailable')
     elif key == 'A':
-        ic705.select_vfo_a()
+        radio.select_vfo_a()
         say('VFO Alpha')
     elif key == 'B':
-        ic705.select_vfo_b()
+        radio.select_vfo_b()
         say('VFO Bravo')
     elif key == 'C':
-        ic705.swap_vfo()
+        radio.swap_vfo()
         say('VFO swapped')
     elif key == 'D':
         say('PiHAMTRC version ' + VERSION + ', ' + CALLSIGN)
@@ -367,9 +414,9 @@ def handle_long_bank1(key):
     if key == '0':
         start_input('freq')
     elif key == '3':
-        lock = ic705.get_lock()
+        lock = radio.get_lock()
         if lock is not None:
-            ic705.set_lock(not lock)
+            radio.set_lock(not lock)
             say('Lock on' if not lock else 'Lock off')
     elif key == '6':
         start_input('rf_power')
@@ -379,227 +426,227 @@ def handle_long_bank1(key):
 # --- BANK 2 short press ---
 def handle_short_bank2(key):
     if key == '0':
-        say_notch_width(ic705.get_notch_width())
+        say_notch_width(radio.get_notch_width())
     elif key == '1':
-        nr = ic705.get_nr()
+        nr = radio.get_nr()
         if nr is None:
             say('NR unavailable')
         else:
             say('Noise reduction on' if nr else 'Noise reduction off')
     elif key == '2':
-        nb = ic705.get_nb()
+        nb = radio.get_nb()
         if nb is None:
             say('NB unavailable')
         else:
             say('Noise blanker on' if nb else 'Noise blanker off')
     elif key == '3':
-        notch = ic705.get_notch()
+        notch = radio.get_notch()
         if notch is None:
             say('Notch unavailable')
         else:
             say('Notch on' if notch else 'Notch off')
     elif key == '4':
-        value = ic705.get_nr_level_percent()
+        value = radio.get_nr_level_percent()
         say('NR level unavailable' if value is None else 'NR level ' + str(value) + ' percent')
     elif key == '5':
-        value = ic705.get_nb_level_percent()
+        value = radio.get_nb_level_percent()
         say('NB level unavailable' if value is None else 'NB level ' + str(value) + ' percent')
     elif key == '6':
-        value = ic705.get_pbt1()
+        value = radio.get_pbt1()
         say('PBT one unavailable' if value is None else 'PBT one ' + str(value))
     elif key == '7':
-        value = ic705.get_pbt2()
+        value = radio.get_pbt2()
         say('PBT two unavailable' if value is None else 'PBT two ' + str(value))
     elif key == '8':
-        shape = ic705.get_filter_shape()
+        shape = radio.get_filter_shape()
         say('Filter shape unavailable' if shape is None else 'Filter shape ' + shape)
     elif key == '9':
-        width = ic705.get_filter_width()
+        width = radio.get_filter_width()
         say('Filter width unavailable' if width is None else 'Filter width ' + str(width))
     elif key == 'A':
-        say_preamp(ic705.get_preamp())
+        say_preamp(radio.get_preamp())
     elif key == 'B':
-        say_att(ic705.get_att())
+        say_att(radio.get_att())
     elif key == 'C':
-        say_agc(ic705.get_agc())
+        say_agc(radio.get_agc())
     elif key == 'D':
-        shape = ic705.get_filter_shape()
-        width = ic705.get_filter_width()
+        shape = radio.get_filter_shape() if radio.has('filter_shape') else None
+        width = radio.get_filter_width()
         if shape is None and width is None:
             say('Filter unavailable')
         else:
-            say('Filter ' + str(width) + ', ' + str(shape))
+            say('Filter ' + str(width) + (', ' + shape if shape else ''))
 
 # --- BANK 2 long press ---
 def handle_long_bank2(key):
     if key == '0':
-        width = ic705.get_notch_width()
+        width = radio.get_notch_width()
         if width is None:
             say('Notch width unavailable')
         else:
             width = 0 if width >= 2 else width + 1
-            ic705.set_notch_width(width)
+            radio.set_notch_width(width)
             say_notch_width(width)
     elif key == '1':
-        nr = ic705.get_nr()
+        nr = radio.get_nr()
         if nr is not None:
-            ic705.set_nr(not nr)
+            radio.set_nr(not nr)
             say('Noise reduction on' if not nr else 'Noise reduction off')
     elif key == '2':
-        nb = ic705.get_nb()
+        nb = radio.get_nb()
         if nb is not None:
-            ic705.set_nb(not nb)
+            radio.set_nb(not nb)
             say('Noise blanker on' if not nb else 'Noise blanker off')
     elif key == '3':
-        notch = ic705.get_notch()
+        notch = radio.get_notch()
         if notch is not None:
-            ic705.set_notch(not notch)
+            radio.set_notch(not notch)
             say('Notch on' if not notch else 'Notch off')
     elif key == '4':
-        adjust_percent(ic705.get_nr_level_percent, ic705.set_nr_level_percent, 'NR level', 10)
+        adjust_percent(radio.get_nr_level_percent, radio.set_nr_level_percent, 'NR level', 10)
     elif key == '5':
-        adjust_percent(ic705.get_nb_level_percent, ic705.set_nb_level_percent, 'NB level', 10)
+        adjust_percent(radio.get_nb_level_percent, radio.set_nb_level_percent, 'NB level', 10)
     elif key == '6':
-        adjust_centered(ic705.get_pbt1, ic705.set_pbt1, 'PBT one', 10)
+        adjust_centered(radio.get_pbt1, radio.set_pbt1, 'PBT one', 10)
     elif key == '7':
-        adjust_centered(ic705.get_pbt2, ic705.set_pbt2, 'PBT two', 10)
+        adjust_centered(radio.get_pbt2, radio.set_pbt2, 'PBT two', 10)
     elif key == '8':
-        shape = ic705.get_filter_shape()
+        shape = radio.get_filter_shape()
         if shape is None:
             say('Filter shape unavailable')
         else:
             next_shape = 'soft' if shape == 'sharp' else 'sharp'
-            ic705.set_filter_shape(next_shape)
+            radio.set_filter_shape(next_shape)
             say('Filter shape ' + next_shape)
     elif key == '9':
-        width = ic705.get_filter_width()
+        width = radio.get_filter_width()
         if width is None:
             say('Filter width unavailable')
         else:
             width = 1 if width >= 3 else width + 1
-            ic705.set_filter_width(width)
+            radio.set_filter_width(width)
             say('Filter width ' + str(width))
     elif key == 'A':
-        value = ic705.get_preamp()
+        value = radio.get_preamp()
         if value is None:
             say('Preamp unavailable')
         else:
             value = 0 if value >= 2 else value + 1
-            ic705.set_preamp(value)
+            radio.set_preamp(value)
             say_preamp(value)
     elif key == 'B':
-        value = ic705.get_att()
+        value = radio.get_att()
         if value is None:
             say('Attenuator unavailable')
         else:
             value = 0 if value else 20
-            ic705.set_att(value)
+            radio.set_att(value)
             say_att(value)
     elif key == 'C':
-        value = ic705.get_agc()
+        value = radio.get_agc()
         if value is None:
             say('AGC unavailable')
         else:
             value = 1 if value >= 3 else value + 1
-            ic705.set_agc(value)
+            radio.set_agc(value)
             say_agc(value)
 
 # --- BANK 2 double-click ---
 def handle_double_bank2(key):
     if key == '0':
-        width = ic705.get_notch_width()
+        width = radio.get_notch_width()
         if width is None:
             say('Notch width unavailable')
         else:
             width = 2 if width <= 0 else width - 1
-            ic705.set_notch_width(width)
+            radio.set_notch_width(width)
             say_notch_width(width)
     elif key == '4':
-        adjust_percent(ic705.get_nr_level_percent, ic705.set_nr_level_percent, 'NR level', -10)
+        adjust_percent(radio.get_nr_level_percent, radio.set_nr_level_percent, 'NR level', -10)
     elif key == '5':
-        adjust_percent(ic705.get_nb_level_percent, ic705.set_nb_level_percent, 'NB level', -10)
+        adjust_percent(radio.get_nb_level_percent, radio.set_nb_level_percent, 'NB level', -10)
     elif key == '6':
-        adjust_centered(ic705.get_pbt1, ic705.set_pbt1, 'PBT one', -10)
+        adjust_centered(radio.get_pbt1, radio.set_pbt1, 'PBT one', -10)
     elif key == '7':
-        adjust_centered(ic705.get_pbt2, ic705.set_pbt2, 'PBT two', -10)
+        adjust_centered(radio.get_pbt2, radio.set_pbt2, 'PBT two', -10)
     elif key == '9':
-        width = ic705.get_filter_width()
+        width = radio.get_filter_width()
         if width is None:
             say('Filter width unavailable')
         else:
             width = 3 if width <= 1 else width - 1
-            ic705.set_filter_width(width)
+            radio.set_filter_width(width)
             say('Filter width ' + str(width))
     elif key == 'A':
-        value = ic705.get_preamp()
+        value = radio.get_preamp()
         if value is None:
             say('Preamp unavailable')
         else:
             value = 2 if value <= 0 else value - 1
-            ic705.set_preamp(value)
+            radio.set_preamp(value)
             say_preamp(value)
     elif key == 'C':
-        value = ic705.get_agc()
+        value = radio.get_agc()
         if value is None:
             say('AGC unavailable')
         else:
             value = 3 if value <= 1 else value - 1
-            ic705.set_agc(value)
+            radio.set_agc(value)
             say_agc(value)
 
 # --- BANK 3 short press ---
 def handle_short_bank3(key):
     if key == '0':
-        split = ic705.get_split()
+        split = radio.get_split()
         say('Split on' if split else 'Split off')
     elif key == '1':
-        freq = ic705.get_freq_mhz()
+        freq = radio.get_freq_mhz()
         if freq:
             say('VFO Alpha frequency ' + '{:.3f}'.format(freq) + ' megahertz')
         else:
             say('VFO Alpha unavailable')
     elif key == '2':
-        freq = ic705.get_vfob_freq()
+        freq = radio.get_vfob_freq()
         if freq:
             say('VFO Bravo frequency ' + '{:.3f}'.format(freq) + ' megahertz')
         else:
             say('VFO Bravo unavailable')
     elif key == '4':
-        mode = ic705.get_mode()
+        mode = radio.get_mode()
         if mode:
             say('VFO Alpha mode ' + mode)
         else:
             say('Mode unavailable')
     elif key == '5':
-        mode = ic705.get_vfob_mode()
+        mode = radio.get_vfob_mode()
         if mode:
             say('VFO Bravo mode ' + mode)
         else:
             say('VFO Bravo mode unavailable')
     elif key == '6':
-        tx = ic705.get_tx()
+        tx = radio.get_tx()
         say('Transmitting' if tx else 'Receiving')
     elif key == 'A':
-        ic705.select_vfo_a()
+        radio.select_vfo_a()
         say('VFO Alpha selected')
     elif key == 'B':
-        ic705.select_vfo_b()
+        radio.select_vfo_b()
         say('VFO Bravo selected')
     elif key == 'C':
-        ic705.swap_vfo()
+        radio.swap_vfo()
         say('VFO swapped')
 
 # --- BANK 3 long press ---
 def handle_long_bank3(key):
     if key == '0':
-        split = ic705.get_split()
-        ic705.set_split(not split)
+        split = radio.get_split()
+        radio.set_split(not split)
         say('Split on' if not split else 'Split off')
     elif key == '1':
-        ic705.select_vfo_a()
+        radio.select_vfo_a()
         say('VFO Alpha selected')
     elif key == '2':
-        ic705.select_vfo_b()
+        radio.select_vfo_b()
         say('VFO Bravo selected')
     elif key == '4':
         start_input('vfoa_mode')
@@ -616,7 +663,7 @@ def handle_double_bank3(key):
 # --- BANK 4 short press ---
 def handle_short_bank4(key):
     if key == '0':
-        tuner = ic705.get_tuner()
+        tuner = radio.get_tuner()
         if tuner is None:
             say('Tuner unavailable')
         elif tuner == 0x02:
@@ -624,19 +671,19 @@ def handle_short_bank4(key):
         else:
             say('Tuner on' if tuner else 'Tuner off')
     elif key == '1':
-        monitor = ic705.get_monitor()
+        monitor = radio.get_monitor()
         if monitor is None:
             say('Monitor unavailable')
         else:
             say('Monitor on' if monitor else 'Monitor off')
     elif key == '2':
-        value = ic705.get_monitor_level_percent()
+        value = radio.get_monitor_level_percent()
         if value is None:
             say('Monitor level unavailable')
         else:
             say('Monitor level ' + str(value) + ' percent')
     elif key == '3':
-        transceive = ic705.get_transceive()
+        transceive = radio.get_transceive()
         if transceive is None:
             say('Transceive unavailable')
         else:
@@ -645,36 +692,36 @@ def handle_short_bank4(key):
 # --- BANK 4 long press ---
 def handle_long_bank4(key):
     if key == '0':
-        tuner = ic705.get_tuner()
+        tuner = radio.get_tuner()
         if tuner is not None:
-            ic705.set_tuner(tuner == 0)
+            radio.set_tuner(tuner == 0)
             say('Tuner on' if tuner == 0 else 'Tuner off')
     elif key == '1':
-        monitor = ic705.get_monitor()
+        monitor = radio.get_monitor()
         if monitor is not None:
-            ic705.set_monitor(not monitor)
+            radio.set_monitor(not monitor)
             say('Monitor on' if not monitor else 'Monitor off')
     elif key == '2':
-        adjust_percent(ic705.get_monitor_level_percent, ic705.set_monitor_level_percent, 'Monitor level', 10)
+        adjust_percent(radio.get_monitor_level_percent, radio.set_monitor_level_percent, 'Monitor level', 10)
     elif key == '3':
-        transceive = ic705.get_transceive()
+        transceive = radio.get_transceive()
         if transceive is not None:
-            ic705.set_transceive(not transceive)
+            radio.set_transceive(not transceive)
             say('Transceive on' if not transceive else 'Transceive off')
 
 # --- BANK 4 double-click ---
 def handle_double_bank4(key):
     if key == '0':
-        ic705.start_tune()
+        radio.start_tune()
         say('Tune')
     elif key == '2':
-        adjust_percent(ic705.get_monitor_level_percent, ic705.set_monitor_level_percent, 'Monitor level', -10)
+        adjust_percent(radio.get_monitor_level_percent, radio.set_monitor_level_percent, 'Monitor level', -10)
 
 # --- BANK 5 short press ---
 def handle_short_bank5(key):
     if key == '0':
-        rit = ic705.get_rit()
-        offset = ic705.get_rit_offset_hz()
+        rit = radio.get_rit()
+        offset = radio.get_rit_offset_hz()
         if rit is None:
             say('RIT unavailable')
         elif offset is None:
@@ -686,14 +733,14 @@ def handle_short_bank5(key):
     elif key == '2':
         adjust_rit(10)
     elif key == '3':
-        ic705.set_rit_offset_hz(0)
+        radio.set_rit_offset_hz(0)
         say('RIT zero')
     elif key == '4':
         adjust_rit(-1)
     elif key == '5':
         adjust_rit(1)
     elif key == '9':
-        rit = ic705.get_rit()
+        rit = radio.get_rit()
         if rit is None:
             say('RIT unavailable')
         else:
@@ -702,16 +749,16 @@ def handle_short_bank5(key):
 # --- BANK 5 long press ---
 def handle_long_bank5(key):
     if key == '0':
-        rit = ic705.get_rit()
+        rit = radio.get_rit()
         if rit is not None:
-            ic705.set_rit(not rit)
+            radio.set_rit(not rit)
             say('RIT on' if not rit else 'RIT off')
     elif key == '1':
         adjust_rit(-100)
     elif key == '2':
         adjust_rit(100)
     elif key == '3':
-        ic705.set_rit(False)
+        radio.set_rit(False)
         say('RIT off')
     elif key == '4':
         adjust_rit(-500)
@@ -721,199 +768,208 @@ def handle_long_bank5(key):
 # --- BANK 5 double-click ---
 def handle_double_bank5(key):
     if key in ('0', '3'):
-        ic705.set_rit_offset_hz(0)
+        radio.set_rit_offset_hz(0)
         say('RIT zero')
 
 # --- BANK 6 short press ---
 def handle_short_bank6(key):
     if key == '0':
-        say_duplex(ic705.get_duplex())
+        say_duplex(radio.get_duplex())
     elif key == '1':
-        tone = ic705.get_repeater_tone()
+        tone = radio.get_repeater_tone()
         say('Repeater tone unavailable' if tone is None else 'Repeater tone on' if tone else 'Repeater tone off')
     elif key == '2':
-        tsql = ic705.get_tsql()
+        tsql = radio.get_tsql()
         say('TSQL unavailable' if tsql is None else 'TSQL on' if tsql else 'TSQL off')
     elif key == '3':
-        dtcs = ic705.get_dtcs()
+        dtcs = radio.get_dtcs()
         say('DTCS unavailable' if dtcs is None else 'DTCS on' if dtcs else 'DTCS off')
     elif key == '4':
-        say_tone_mode(ic705.get_tone_squelch_mode())
+        say_tone_mode(radio.get_tone_squelch_mode())
     elif key == '5':
-        say_dsql_csql(ic705.get_dsql_csql())
+        say_dsql_csql(radio.get_dsql_csql())
 
 # --- BANK 6 long press ---
 def handle_long_bank6(key):
     if key == '0':
-        value = ic705.get_duplex()
+        value = radio.get_duplex()
         if value is None:
             say('Duplex unavailable')
         else:
             next_value = -1 if value == 0 else 1 if value < 0 else 0
-            ic705.set_duplex(next_value)
+            radio.set_duplex(next_value)
             say_duplex(next_value)
     elif key == '1':
-        tone = ic705.get_repeater_tone()
+        tone = radio.get_repeater_tone()
         if tone is not None:
-            ic705.set_repeater_tone(not tone)
+            radio.set_repeater_tone(not tone)
             say('Repeater tone on' if not tone else 'Repeater tone off')
     elif key == '2':
-        tsql = ic705.get_tsql()
+        tsql = radio.get_tsql()
         if tsql is not None:
-            ic705.set_tsql(not tsql)
+            radio.set_tsql(not tsql)
             say('TSQL on' if not tsql else 'TSQL off')
     elif key == '3':
-        dtcs = ic705.get_dtcs()
+        dtcs = radio.get_dtcs()
         if dtcs is not None:
-            ic705.set_dtcs(not dtcs)
+            radio.set_dtcs(not dtcs)
             say('DTCS on' if not dtcs else 'DTCS off')
     elif key == '4':
         modes = [0, 1, 2, 3, 6, 7, 8, 9]
-        value = ic705.get_tone_squelch_mode()
+        value = radio.get_tone_squelch_mode()
         if value is None:
             say('Tone mode unavailable')
         else:
             next_value = modes[(modes.index(value) + 1) % len(modes)] if value in modes else 0
-            ic705.set_tone_squelch_mode(next_value)
+            radio.set_tone_squelch_mode(next_value)
             say_tone_mode(next_value)
     elif key == '5':
-        value = ic705.get_dsql_csql()
+        value = radio.get_dsql_csql()
         if value is None:
             say('Digital squelch unavailable')
         else:
             value = 0 if value >= 2 else value + 1
-            ic705.set_dsql_csql(value)
+            radio.set_dsql_csql(value)
             say_dsql_csql(value)
 
 # --- BANK 6 double-click ---
 def handle_double_bank6(key):
     if key == '0':
-        value = ic705.get_duplex()
+        value = radio.get_duplex()
         if value is None:
             say('Duplex unavailable')
         else:
             next_value = 1 if value == 0 else -1 if value > 0 else 0
-            ic705.set_duplex(next_value)
+            radio.set_duplex(next_value)
             say_duplex(next_value)
     elif key == '5':
-        value = ic705.get_dsql_csql()
+        value = radio.get_dsql_csql()
         if value is None:
             say('Digital squelch unavailable')
         else:
             value = 2 if value <= 0 else value - 1
-            ic705.set_dsql_csql(value)
+            radio.set_dsql_csql(value)
             say_dsql_csql(value)
 
 # --- BANK 7 short press ---
 def handle_short_bank7(key):
     if key == '0':
-        ic705.select_memory_mode()
+        radio.select_memory_mode()
         say('Memory mode')
     elif key == '1':
         start_input('memory_channel')
     elif key == '2':
-        ic705.memory_copy_to_vfo()
+        radio.memory_copy_to_vfo()
         say('Memory copied to VFO')
     elif key == '3':
-        ic705.scan_stop()
+        radio.scan_stop()
         say('Scan stop')
     elif key == '4':
-        ic705.scan_program_memory()
+        radio.scan_program_memory()
         say('Program memory scan')
     elif key == '5':
-        ic705.scan_memory()
+        radio.scan_memory()
         say('Memory scan')
     elif key == '6':
-        value = ic705.get_dv_data_tx()
+        value = radio.get_dv_data_tx()
         say('DV data TX unavailable' if value is None else 'DV data TX auto' if value else 'DV data TX PTT')
     elif key == '7':
-        value = ic705.get_dv_fast_data()
+        value = radio.get_dv_fast_data()
         say('DV fast data unavailable' if value is None else 'DV fast data on' if value else 'DV fast data off')
     elif key == '8':
-        value = ic705.get_gps_select()
+        value = radio.get_gps_select()
         names = {0: 'GPS off', 1: 'GPS on', 3: 'GPS manual'}
         say(names.get(value, 'GPS unavailable') if value is not None else 'GPS unavailable')
     elif key == '9':
-        value = ic705.get_gps_tx_mode()
+        value = radio.get_gps_tx_mode()
         names = {0: 'GPS TX off', 1: 'GPS TX DPRS', 2: 'GPS TX NMEA'}
         say(names.get(value, 'GPS TX unavailable') if value is not None else 'GPS TX unavailable')
 
 # --- BANK 7 long press ---
 def handle_long_bank7(key):
     if key == '0':
-        ic705.memory_write()
-        say('Memory write')
+        if radio.has('memory'):
+            start_input('confirm_memory_write')
+        else:
+            raise radio.NotAvailable('memory')
     elif key == '2':
-        ic705.memory_clear()
-        say('Memory clear')
+        if radio.has('memory_clear'):
+            start_input('confirm_memory_clear')
+        else:
+            raise radio.NotAvailable('memory_clear')
     elif key == '4':
-        ic705.scan_program()
+        radio.scan_program()
         say('Program scan')
     elif key == '5':
-        ic705.scan_select_memory()
+        radio.scan_select_memory()
         say('Select memory scan')
     elif key == '6':
-        value = ic705.get_dv_data_tx()
+        value = radio.get_dv_data_tx()
         if value is not None:
             value = 0 if value else 1
-            ic705.set_dv_data_tx(value)
+            radio.set_dv_data_tx(value)
             say('DV data TX auto' if value else 'DV data TX PTT')
     elif key == '7':
-        value = ic705.get_dv_fast_data()
+        value = radio.get_dv_fast_data()
         if value is not None:
-            ic705.set_dv_fast_data(not value)
+            radio.set_dv_fast_data(not value)
             say('DV fast data on' if not value else 'DV fast data off')
     elif key == '8':
-        value = ic705.get_gps_select()
+        value = radio.get_gps_select()
         if value is not None:
             next_value = 1 if value == 0 else 3 if value == 1 else 0
-            ic705.set_gps_select(next_value)
+            radio.set_gps_select(next_value)
             names = {0: 'GPS off', 1: 'GPS on', 3: 'GPS manual'}
             say(names[next_value])
     elif key == '9':
-        value = ic705.get_gps_tx_mode()
+        value = radio.get_gps_tx_mode()
         if value is not None:
             next_value = 0 if value >= 2 else value + 1
-            ic705.set_gps_tx_mode(next_value)
+            radio.set_gps_tx_mode(next_value)
             names = {0: 'GPS TX off', 1: 'GPS TX DPRS', 2: 'GPS TX NMEA'}
             say(names[next_value])
 
 # --- BANK 8 short press ---
 def handle_short_bank8(key):
     if key == '1':
-        say('CI V address ' + str(ic705.get_civ_address()))
+        say('CI V address ' + str(radio.get_civ_address()))
     elif key == '2':
-        say('Baud rate ' + str(ic705.get_baudrate()))
+        say('Baud rate ' + str(radio.get_baudrate()))
 
 # --- BANK 8 long press ---
 def handle_long_bank8(key):
-    if key == '1':
+    if key == 'D':
+        if radio.remember_link():
+            say('CI V settings saved for ' + radio.current().spoken)
+        else:
+            say('CI V settings not saved')
+    elif key == '1':
         start_input('civ_address')
     elif key == '2':
-        baud = ic705.get_baudrate()
+        baud = radio.get_baudrate()
         idx = BAUD_RATES.index(baud) if baud in BAUD_RATES else len(BAUD_RATES) - 1
         baud = BAUD_RATES[(idx + 1) % len(BAUD_RATES)]
-        ic705.set_baudrate(baud)
+        radio.set_baudrate(baud)
         say('Baud rate ' + str(baud))
 
 # --- BANK 8 double-click ---
 def handle_double_bank8(key):
     if key == '2':
-        baud = ic705.get_baudrate()
+        baud = radio.get_baudrate()
         idx = BAUD_RATES.index(baud) if baud in BAUD_RATES else len(BAUD_RATES) - 1
         baud = BAUD_RATES[(idx - 1) % len(BAUD_RATES)]
-        ic705.set_baudrate(baud)
+        radio.set_baudrate(baud)
         say('Baud rate ' + str(baud))
 
 # --- BANK 9 short press ---
 def handle_short_bank9(key):
     global volume_level
     if key == 'A':
-        say('Icom IC-705 profile')
+        say(radio.current().spoken + ' profile')
     elif key == '1':
-        say('Profile next unavailable')
+        switch_radio(1)
     elif key == '2':
-        say('Profile previous unavailable')
+        switch_radio(-1)
     elif key == '4':
         say('Tuning speech on' if tuning_speech else 'Tuning speech off')
     elif key == '5':
@@ -941,6 +997,13 @@ def handle_long_bank9(key):
         volume_level = min(9, volume_level + 1)
         say('Volume ' + str(volume_level))
 
+# --- Switch radio ---
+def switch_radio(step):
+    if radio.switch(step):
+        say(radio.current().spoken + ' connected')
+    else:
+        say(radio.current().spoken + ' selected, not connected')
+
 # --- Switch bank ---
 def handle_bank_next():
     global bank
@@ -957,7 +1020,23 @@ def handle_bank_prev():
     say(BANK_NAMES[bank])
 
 # --- Main dispatch ---
+def run_action(handler, key):
+    """Run one key action; a feature the radio lacks is spoken, not sent."""
+    try:
+        handler(key)
+    except radio.NotAvailable as e:
+        say(e.spoken())
+
 def handle_short(key):
+    run_action(_handle_short, key)
+
+def handle_long(key):
+    run_action(_handle_long, key)
+
+def handle_double(key):
+    run_action(_handle_double, key)
+
+def _handle_short(key):
     if key == '*':
         say(BANK_NAMES[bank])
         return
@@ -980,7 +1059,7 @@ def handle_short(key):
     elif bank == 9:
         handle_short_bank9(key)
 
-def handle_long(key):
+def _handle_long(key):
     if key == '*':
         start_input('bank')
         return
@@ -1003,7 +1082,7 @@ def handle_long(key):
     elif bank == 9:
         handle_long_bank9(key)
 
-def handle_double(key):
+def _handle_double(key):
     if bank == 2:
         handle_double_bank2(key)
     elif bank == 3:
@@ -1031,7 +1110,7 @@ def handle_released_key(key, duration_ms):
 
     if input_mode is not None:
         flush_pending_click()
-        handle_input_key(key)
+        run_action(handle_input_key, key)
     elif duration_ms >= LONG_PRESS_MS:
         flush_pending_click()
         handle_long(key)
@@ -1051,24 +1130,27 @@ def main():
     import speech
     speech.AUDIO_DEVICE = audio
 
+    profile = radio.start(getattr(config, 'RADIO_PROFILE', 'ic705'),
+                          getattr(config, 'SERIAL_PORTS', {}))
+    name = profile.spoken
     try:
-        ic705.connect(DEVICE_RADIO)
+        radio.connect()
     except Exception as e:
-        print('IC-705 not found: ' + str(e))
-        say('IC-705 not connected')
+        print(profile.name + ' not found on ' + radio.serial_port() + ': ' + str(e))
+        say(name + ' not connected')
         sys.exit(1)
 
     say('PiHAMTRC ready, version ' + VERSION)
-    freq = ic705.get_freq_mhz()
-    mode = ic705.get_mode()
+    freq = radio.get_freq_mhz()
+    mode = radio.get_mode()
     if freq is None and mode is None:
-        say('IC-705 connected, status unavailable')
+        say(name + ' connected, status unavailable')
     elif freq is None:
-        say('IC-705 connected, ' + str(mode) + ', frequency unavailable')
+        say(name + ' connected, ' + str(mode) + ', frequency unavailable')
     elif mode is None:
-        say('IC-705 connected, mode unavailable, frequency ' + '{:.3f}'.format(freq) + ' megahertz')
+        say(name + ' connected, mode unavailable, frequency ' + '{:.3f}'.format(freq) + ' megahertz')
     else:
-        say('IC-705 connected, ' + str(mode) + ', frequency ' + '{:.3f}'.format(freq) + ' megahertz')
+        say(name + ' connected, ' + str(mode) + ', frequency ' + '{:.3f}'.format(freq) + ' megahertz')
 
     dev = find_keyboard()
     if dev is None:
